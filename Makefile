@@ -11,11 +11,10 @@ install:
 	mkdir -p /opt/$(APP_NAME)
 	mkdir -p /etc/$(APP_NAME)
 
-	cp -r src/* /opt/$(APP_NAME)/
+	cp -a src/. /opt/$(APP_NAME)/
 
-	cp -r .env.example /etc/$(APP_NAME)/
+	cp -a .env.example /etc/$(APP_NAME)/
 
-	# Install systemd unit
 	cp $(APP_NAME).service /etc/systemd/system/
 
 start:
