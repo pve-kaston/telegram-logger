@@ -4,7 +4,7 @@ INSTALL_PATH = /opt/$(APP_NAME)
 CONFIG_PATH = /etc/$(APP_NAME)
 SYSTEMD_PATH = /etc/systemd/system
 
-.PHONY: install uninstall restart status
+.PHONY: install start uninstall restart status
 
 install:
 	@echo ">>> Installing $(APP_NAME)..."
@@ -18,6 +18,7 @@ install:
 	# Install systemd unit
 	cp $(APP_NAME).service /etc/systemd/system/
 
+start:
 	# Start and enable systemd
 	systemctl daemon-reload
 	systemctl enable --now $(APP_NAME).service
