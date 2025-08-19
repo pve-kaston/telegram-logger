@@ -8,14 +8,16 @@ SYSTEMD_PATH = /etc/systemd/system
 
 install:
 	@echo ">>> Installing $(APP_NAME)..."
-	mkdir -p /opt/$(APP_NAME)
+	useradd --system --no-create-home --shell /usr/sbin/nologin logger || true
+	
+	mkdir -p /opt/$(APP_NAME)/db && touch /opt/$(APP_NAME)/db/messages.db && touch /opt/$(APP_NAME)/db/user.session
 	mkdir -p /etc/$(APP_NAME)
 
-	cp -a src/. /opt/$(APP_NAME)/
+	cp -a src/. /opt/$(APP_NAME)/ && chown -R $(APP_NAME):$(APP_NAME) /opt/$(APP_NAME)
 
-	cp -a .env.example /etc/$(APP_NAME)/
+	cp -a .env.example /etc/$(APP_NAME)/.env && chown -R $(APP_NAME):$(APP_NAME) /etc/$(APP_NAME)
 
-	cp $(APP_NAME).service /etc/systemd/system/
+	cp $(APP_NAME).service /etc/systemd/system/ && chown $(APP_NAME):$(APP_NAME) /etc/systemd/system/$(APP_NAME).service
 
 start:
 	# Start and enable systemd
@@ -32,6 +34,7 @@ uninstall:
 	rm -rf /etc/$(APP_NAME)/
 	rm -f /etc/systemd/system/$(APP_NAME).service
 	systemctl daemon-reload
+	userdel logger
 	@echo ">>> Deleted!"
 
 restart:
