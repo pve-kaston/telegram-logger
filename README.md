@@ -1,20 +1,73 @@
-# Telegram Logger
+# Logger Service
 
-- Saves deleted and edited messages to another (private) chat.
-- Works for forward restricted and self destructing messages.
-- To manually save forward restricted messages, send the message link(s), whitespace separated, to the logger chat. Supports t.me and tg://openmessage links.
+Сервис для логирования удалённых медиа и сообщений из Telegram личных чатов и групп (в будущем и каналов).
 
-At the time of writing, official stable telethon is still on layer 133, so you may need this fork instead
+## Установка
 
-`pip install git+https://github.com/TelegramPlayGround/Telethon.git@rotcev`
+Клонируем репозиторий и выполняем команду
 
-Rename `.env.dist` to `.env` and fill in the stuff.
-The chat IDs there, are bot api style IDs.
+`make install`
 
-- Logs a limited amount of messages at a time to reduce chances of getting a FloodWaitError.
-  You probably don't want to see that spam anyways.
-- Telegram [doesn’t always notify](https://docs.telethon.dev/en/latest/quick-references/events-reference.html#messagedeleted) the clients that a message was deleted, so it will miss some.
-- You might not have access to the media after it was deleted
+Команда создаст пользователя, права и скопирует файлы.
 
+---
 
-By using this piece of spaghetti, you agree to not agree with Telegram's terms of service.
+## Настройка
+
+Редактируем файл окружения по примеру:
+
+`sudo nano /etc/logger/.env`
+
+### Пример `.env`
+
+```
+# Telegram credentials
+API_ID=12345678
+API_HASH="ljgewlrgwkfnewigwud234gwef"
+SESSION_NAME="db/user.session"
+
+# Chat where all deleted messages will be dumped
+LOG_CHAT_ID=-1234567890
+IGNORED_IDS=[]
+
+# Message sending settings
+LISTEN_OUTGOING_MESSAGES=FALSE
+SAVE_EDITED_MESSAGES=True
+DELETE_SENT_GIFS_FROM_SAVED=True
+DELETE_SENT_STICKERS_FROM_SAVED=True
+
+# Limits
+MAX_IN_MEMORY_FILE_SIZE=5242880
+
+# SQLite config
+SQLITE_DB_FILE="db/messages.db"
+PERSIST_TIME_IN_DAYS_BOT=1
+PERSIST_TIME_IN_DAYS_USER=1
+PERSIST_TIME_IN_DAYS_CHANNEL=1
+PERSIST_TIME_IN_DAYS_GROUP=1
+
+# Debug / Rate limit
+DEBUG_MODE=0
+RATE_LIMIT_NUM_MESSAGES=5
+```
+
+---
+
+## Подготовка `user.session`
+
+1. Вручную запустите Python скрипт и пройдите авторизацию в телеграмм аккаунт.
+2. Переместите созданный `user.session` файл в директорию `/opt/logger/db/user.session`
+
+  `sudo cp src/db/user.session /opt/logger/db/user.session`
+
+---
+
+## Запуск
+
+Выполните команду для запуска сервиса
+
+`make start`
+
+А так же для проверки состояния сервиса
+
+`make status`
