@@ -114,8 +114,8 @@ async def save_media_as_file(msg: Message):
     except Exception:
         fsize = None
 
-    if fsize is not None and fsize > MAX_BUFFER_FILE_SIZE:
-        logging.warning(f"Skip buffering large file: {fsize} > {MAX_BUFFER_FILE_SIZE}")
+    if fsize is not None and fsize > settings.max_buffer_file_size:
+        logging.warning(f"Skip buffering large file: {fsize} > {settings.max_buffer_file_size}")
         return
 
     os.makedirs(MEDIA_DIR, exist_ok=True)
