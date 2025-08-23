@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Final
 
-from pydantic import SecretStr
+from pydantic import SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     session_name: str = "db/user.session"
 
     log_chat_id: int
-    ignored_ids: Set[int] = Field(default_factory=set)
+    ignored_ids: set[int] = Field(default_factory=set)
     
     listen_outgoing_messages: bool = True
     save_edited_messages: bool = False
