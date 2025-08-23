@@ -186,5 +186,5 @@ cython_debug/
 .tests/
 db/
 media/*
-#*.db
+*.db
 *.session

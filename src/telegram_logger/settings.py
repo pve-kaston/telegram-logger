@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     file_password: SecretStr = "super secret password"
     max_in_memory_file_size: int = 5 * 1024 * 1024
 
+    media_buffer_ttl_hours: int = 24
+    max_buffer_file_size: int = 200 * 1024 * 1024
+
     sqlite_db_file: Path = "db/messages.db"
     persist_time_in_days_bot: int = 1
     persist_time_in_days_user: int = 1

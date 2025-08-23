@@ -29,8 +29,8 @@ from telegram_logger.tg_types import ChatType
 # ====== Конфиг (можно переопределить в settings.py) ======
 MEDIA_DIR = getattr(settings, "media_dir", "media")
 MEDIA_DELETED_DIR = getattr(settings, "media_deleted_dir", "media_deleted")
-MEDIA_BUFFER_TTL_HOURS = int(getattr(settings, "media_buffer_ttl_hours", 24))
-MAX_BUFFER_FILE_SIZE = int(getattr(settings, "max_buffer_file_size", 200 * 1024 * 1024))
+# MEDIA_BUFFER_TTL_HOURS = int(getattr(settings, "media_buffer_ttl_hours", 24))
+# MAX_BUFFER_FILE_SIZE = int(getattr(settings, "max_buffer_file_size", 200 * 1024 * 1024))
 
 client: TelegramClient
 MY_ID: int
