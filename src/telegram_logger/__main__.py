@@ -418,7 +418,7 @@ async def purge_expired_media_files():
     """
     Удаляем файлы из MEDIA_DIR старше TTL. MEDIA_DELETED_DIR не трогаем (архив удалённых).
     """
-    ttl = timedelta(hours=MEDIA_BUFFER_TTL_HOURS)
+    ttl = timedelta(hours=settings.media_buffer_ttl_hours)
     if not os.path.isdir(MEDIA_DIR):
         return
     removed = 0
