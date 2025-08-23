@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Union
 
+
 from telethon import TelegramClient, events
 from telethon.events import MessageDeleted, MessageEdited, NewMessage
 from telethon.hints import Entity
@@ -25,6 +26,8 @@ from telegram_logger.database.methods import (
 )
 from telegram_logger.settings import settings
 from telegram_logger.tg_types import ChatType
+from telegram_logger.health import setup_healthcheck, beat_housekeeping
+
 
 # ====== Конфиг (можно переопределить в settings.py) ======
 MEDIA_DIR = getattr(settings, "media_dir", "media")
@@ -443,6 +446,7 @@ async def housekeeping_loop() -> None:
     - удаляем протухший буфер из MEDIA_DIR.
     """
     while True:
+        beat_housekeeping()
         now = _utcnow()
         try:
             await delete_expired_messages_from_db(current_time=now)
@@ -465,7 +469,12 @@ async def init() -> None:
     settings.ignored_ids.add(settings.log_chat_id)
     MY_ID = (await client.get_me()).id
 
+    logging.basicConfig(level="INFO" if settings.debug_mode else "WARNING")
+    # healthcheck: повесить ловушку ошибок и поднять HTTP
+    setup_healthcheck()
+    settings.ignored_ids.add(settings.log_chat_id)
     # New/Edited для первичного сохранения и буферизации
+    
     client.add_event_handler(
         new_message_handler, events.NewMessage(incoming=True, outgoing=settings.listen_outgoing_messages)
     )
