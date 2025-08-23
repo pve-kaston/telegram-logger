@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     session_name: str = "db/user.session"
 
     log_chat_id: int
-    ignored_ids: set[int] = Field(default_factory=set)
-
+    ignored_ids: Set[int] = Field(default_factory=set)
+    
     listen_outgoing_messages: bool = True
     save_edited_messages: bool = False
     delete_sent_gifs_from_saved: bool = True
