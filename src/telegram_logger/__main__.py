@@ -32,6 +32,7 @@ from telegram_logger.health import setup_healthcheck, beat_housekeeping
 # ====== Конфиг (можно переопределить в settings.py) ======
 MEDIA_DIR = getattr(settings, "media_dir", "media")
 MEDIA_DELETED_DIR = getattr(settings, "media_deleted_dir", "media_deleted")
+MAX_LEN = 4096  # лимит Telegram
 # MEDIA_BUFFER_TTL_HOURS = int(getattr(settings, "media_buffer_ttl_hours", 24))
 # MAX_BUFFER_FILE_SIZE = int(getattr(settings, "max_buffer_file_size", 200 * 1024 * 1024))
 
@@ -274,6 +275,11 @@ async def create_mention(entity_id, chat_msg_id: Optional[int] = None) -> str:
         mention = str(entity_id)
     return mention
 
+async def safe_send_message(chat_id: int, text: str):
+    if not text or len(text) > MAX_LEN:
+        logging.warning("Skipped sending message: too long")
+        return
+    await client.send_message(chat_id, text)
 
 async def _copy_to_deleted_dir(msg_id: int, chat_id: int, media) -> Optional[str]:
     """
@@ -332,7 +338,7 @@ async def edited_deleted_handler(event):
                     f"**Before:**\n```{old_text}```\n"
                     f"**After:**\n```{new_text}```"
                 )
-                await client.send_message(settings.log_chat_id, log_text)
+                await safe_send_message(settings.log_chat_id, log_text)
             except Exception as e:
                 logging.exception(f"Failed to send edited text to log chat: {e}")
 
@@ -390,11 +396,11 @@ async def edited_deleted_handler(event):
             if message.msg_text:
                 text += "**Message:**\n" + message.msg_text
 
-            if text.strip():
-                try:
-                    await client.send_message(settings.log_chat_id, text)
-                except Exception as e:
-                    logging.exception(f"Failed to send deleted text to log chat: {e}")
+        if text.strip():
+            try:
+                await safe_send_message(settings.log_chat_id, text)
+            except Exception as e:
+                logging.exception(f"Failed to send deleted text to log chat: {e}")
 
     logging.info(f"Processed deletion/self-destruct event, items: {len(messages)}")
 
