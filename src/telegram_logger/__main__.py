@@ -380,21 +380,23 @@ async def edited_deleted_handler(event):
                 )
             except Exception as e:
                 logging.exception(f"Failed to send deleted media {copied_path} to log chat: {e}")
-        else:
-            # Удалённый текст без медиа: отправляем текст
-            try:
-                mention_sender = await create_mention(message.from_id)
-                mention_chat = await create_mention(message.chat_id, message.id)
-                if isinstance(event, types.UpdateReadMessagesContents):
-                    header = f"**Deleted #selfdestructing message from:** {mention_sender}\n"
-                else:
-                    header = f"**Deleted message from:** {mention_sender}\n"
-                text = header + f"in {mention_chat}\n"
-            except Exception:
-                text = "**Deleted message (text)**\n"
+            # ← важно: выходим из итерации, чтобы не обращаться к text ниже
+            continue
 
-            if message.msg_text:
-                text += "**Message:**\n" + message.msg_text
+        # Удалённый текст без медиа: формируем и отправляем текст
+        try:
+            mention_sender = await create_mention(message.from_id)
+            mention_chat = await create_mention(message.chat_id, message.id)
+            if isinstance(event, types.UpdateReadMessagesContents):
+                header = f"**Deleted #selfdestructing message from:** {mention_sender}\n"
+            else:
+                header = f"**Deleted message from:** {mention_sender}\n"
+            text = header + f"in {mention_chat}\n"
+        except Exception:
+            text = "**Deleted message (text)**\n"
+
+        if message.msg_text:
+            text += "**Message:**\n" + message.msg_text
 
         if text.strip():
             try:
