@@ -27,7 +27,7 @@ class DbMessage(Base):
     from_id: Mapped[Int64] = mapped_column()
     chat_id: Mapped[Int64] = mapped_column()
     type: Mapped[int] = mapped_column()
-    msg_text: Mapped[str] = mapped_column()
+    msg_text: Mapped[str | None] = mapped_column(nullable=True)
     media: Mapped[bytes] = mapped_column(nullable=True)
     noforwards: Mapped[bool] = mapped_column(default=False)
     self_destructing: Mapped[bool] = mapped_column(default=False)
