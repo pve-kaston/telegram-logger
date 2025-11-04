@@ -158,7 +158,7 @@ async def save_media_as_file(msg: Message):
 
     try:
         await client.download_media(msg.media, file_path)
-        logging.info(f"Downloaded media to {file_path}")
+#        logging.info(f"Downloaded media to {file_path}")
     except Exception as e:
         logging.exception(f"Failed to download media for msg {msg.id} in chat {msg.chat_id}: {e}")
 
