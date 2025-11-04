@@ -105,10 +105,30 @@ def _safe_name(name: str) -> str:
 def _compose_media_path(base_dir: str, msg_id: int, chat_id: int, file_name: str) -> str:
     return os.path.join(base_dir, f"{msg_id}_{chat_id}_{_safe_name(file_name)}")
 
+async def _get_entity_name(entity_id: int) -> str:
+    """
+    Возвращает username, title или имя пользователя для формирования имени файла.
+    """
+    try:
+        entity = await client.get_entity(entity_id)
+        if getattr(entity, "username", None):
+            return entity.username
+        if getattr(entity, "title", None):
+            return _safe_name(entity.title)
+        if getattr(entity, "first_name", None):
+            name = entity.first_name
+            if getattr(entity, "last_name", None):
+                name += "_" + entity.last_name
+            return _safe_name(name)
+    except Exception as e:
+        logging.warning(f"Failed to get entity name for {entity_id}: {e}")
+    return str(entity_id)
+
 
 async def save_media_as_file(msg: Message):
     """
-    Скачиваем любое медиа в буфер MEDIA_DIR (если не слишком большое).
+    Скачиваем любое медиа в буфер MEDIA_DIR (если не слишком большое),
+    и сохраняем файл с именем, содержащим username/название чата вместо id.
     """
     if not msg or not msg.media:
         return
@@ -124,13 +144,21 @@ async def save_media_as_file(msg: Message):
 
     os.makedirs(MEDIA_DIR, exist_ok=True)
     file_name = get_file_name(msg.media)
-    file_path = _compose_media_path(MEDIA_DIR, msg.id, msg.chat_id, file_name)
+
+    # 🔹 Получаем username / название чата / имя отправителя
+    sender_name = await _get_entity_name(msg.sender_id or 0)
+    chat_name = await _get_entity_name(msg.chat_id or 0)
+
+    # Формируем имя файла: username_msgid_originalname
+    combined_name = f"{sender_name}_{msg.id}_{_safe_name(file_name)}"
+    file_path = os.path.join(MEDIA_DIR, combined_name)
 
     if os.path.exists(file_path):
         return
 
     try:
         await client.download_media(msg.media, file_path)
+        logging.info(f"Downloaded media to {file_path}")
     except Exception as e:
         logging.exception(f"Failed to download media for msg {msg.id} in chat {msg.chat_id}: {e}")
 
