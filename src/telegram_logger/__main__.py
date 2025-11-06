@@ -98,7 +98,6 @@ def _compose_media_path(base_dir: str, msg_id: int, chat_id: int, file_name: str
 # =======================================================
 # ============= УЛУЧШЕННАЯ ФУНКЦИЯ СКАЧИВАНИЯ ===========
 # =======================================================
-
 async def save_media_as_file(msg: Message, retries: int = 3):
     if not msg or not msg.media:
         return
@@ -114,10 +113,11 @@ async def save_media_as_file(msg: Message, retries: int = 3):
 
     os.makedirs(MEDIA_DIR, exist_ok=True)
     file_name = get_file_name(msg.media)
-    sender_name = await _get_entity_name(msg.sender_id or 0)
-    chat_name = await _get_entity_name(msg.chat_id or 0)
-    combined_name = f"{sender_name}_{msg.id}_{_safe_name(file_name)}"
+
+    # ❗ теперь имя совпадает с _compose_media_path
+    combined_name = f"{msg.id}_{msg.chat_id}_{_safe_name(file_name)}"
     file_path = os.path.join(MEDIA_DIR, combined_name)
+
     if os.path.exists(file_path):
         return
 
