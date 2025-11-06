@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Union
 
-
+from telethon.errors import FileReferenceExpiredError, FileMigrateError
 from telethon import TelegramClient, events
 from telethon.events import MessageDeleted, MessageEdited, NewMessage
 from telethon.hints import Entity
@@ -124,7 +124,6 @@ async def _get_entity_name(entity_id: int) -> str:
         logging.warning(f"Failed to get entity name for {entity_id}: {e}")
     return str(entity_id)
 
-
 async def save_media_as_file(msg: Message):
     """
     Скачиваем любое медиа в буфер MEDIA_DIR (если не слишком большое),
@@ -149,7 +148,6 @@ async def save_media_as_file(msg: Message):
     sender_name = await _get_entity_name(msg.sender_id or 0)
     chat_name = await _get_entity_name(msg.chat_id or 0)
 
-    # Формируем имя файла: username_msgid_originalname
     combined_name = f"{sender_name}_{msg.id}_{_safe_name(file_name)}"
     file_path = os.path.join(MEDIA_DIR, combined_name)
 
@@ -158,10 +156,32 @@ async def save_media_as_file(msg: Message):
 
     try:
         await client.download_media(msg.media, file_path)
-#        logging.info(f"Downloaded media to {file_path}")
+    except FileReferenceExpiredError:
+        # 🩵 file_reference устарел — обновляем сообщение и повторяем
+        logging.warning(f"File reference expired for msg {msg.id}, refetching message...")
+        try:
+            fresh_msg = await client.get_messages(msg.chat_id, ids=msg.id)
+            if fresh_msg and fresh_msg.media:
+                await client.download_media(fresh_msg.media, file_path)
+                logging.info(f"Downloaded media after refetch for msg {msg.id}")
+            else:
+                logging.warning(f"Failed to refetch media for msg {msg.id} — no media found")
+        except Exception as e2:
+            logging.exception(f"Retry after FileReferenceExpiredError failed for msg {msg.id}: {e2}")
+
+    except FileMigrateError as e:
+        # 🩵 Telegram сообщил, что файл хранится в другом DC
+        logging.warning(f"FileMigrateError for msg {msg.id}, DC: {e.new_dc}")
+        try:
+            await client.connect()  # убедимся, что соединение живое
+            fresh_msg = await client.get_messages(msg.chat_id, ids=msg.id)
+            await client.download_media(fresh_msg.media, file_path)
+            logging.info(f"Downloaded media after FileMigrateError for msg {msg.id}")
+        except Exception as e3:
+            logging.exception(f"Retry after FileMigrateError failed for msg {msg.id}: {e3}")
+
     except Exception as e:
         logging.exception(f"Failed to download media for msg {msg.id} in chat {msg.chat_id}: {e}")
-
 
 @contextmanager
 def retrieve_media_as_file(msg_id: int, chat_id: int, media, _noforwards_or_ttl: bool):
