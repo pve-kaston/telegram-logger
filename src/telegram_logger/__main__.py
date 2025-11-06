@@ -5,7 +5,6 @@ import pickle
 import re
 import sys
 import shutil
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Union
 
@@ -75,6 +74,9 @@ def _safe_name(name: str) -> str:
 
 
 async def _get_entity_name(entity_id: int) -> str:
+    """
+    Возвращает @username, title канала/чата или имя пользователя; безопасно для файловой системы.
+    """
     try:
         entity = await client.get_entity(entity_id)
         if getattr(entity, "username", None):
@@ -91,14 +93,35 @@ async def _get_entity_name(entity_id: int) -> str:
     return str(entity_id)
 
 
-def _compose_media_path(base_dir: str, msg_id: int, chat_id: int, file_name: str) -> str:
-    return os.path.join(base_dir, f"{msg_id}_{chat_id}_{_safe_name(file_name)}")
+def _canonical_prefix(msg_id: int, chat_id: int) -> str:
+    return f"{msg_id}_{chat_id}_"
+
+
+def _find_media_file(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
+    """
+    Ищет сохранённый файл по каноническому префиксу 'msgid_chatid_'.
+    Возвращает полный путь или None.
+    """
+    prefix = _canonical_prefix(msg_id, chat_id)
+    try:
+        for name in os.listdir(base_dir):
+            if name.startswith(prefix):
+                path = os.path.join(base_dir, name)
+                if os.path.isfile(path):
+                    return path
+    except FileNotFoundError:
+        return None
+    return None
 
 
 # =======================================================
 # ============= УЛУЧШЕННАЯ ФУНКЦИЯ СКАЧИВАНИЯ ===========
 # =======================================================
 async def save_media_as_file(msg: Message, retries: int = 3):
+    """
+    Скачиавет медиа и сохраняет файл как:
+    {msg.id}_{msg.chat_id}_{chat_name}_{original_name}
+    """
     if not msg or not msg.media:
         return
 
@@ -114,11 +137,14 @@ async def save_media_as_file(msg: Message, retries: int = 3):
     os.makedirs(MEDIA_DIR, exist_ok=True)
     file_name = get_file_name(msg.media)
 
-    # ❗ теперь имя совпадает с _compose_media_path
-    combined_name = f"{msg.id}_{msg.chat_id}_{_safe_name(file_name)}"
+    # Название чата в имени файла (как просили), плюс канонический префикс
+    chat_name = await _get_entity_name(msg.chat_id or 0)
+    combined_name = f"{_canonical_prefix(msg.id, msg.chat_id)}{chat_name}_{_safe_name(file_name)}"
     file_path = os.path.join(MEDIA_DIR, combined_name)
 
-    if os.path.exists(file_path):
+    # Если уже есть файл с таким префиксом — не дублируем
+    existing = _find_media_file(MEDIA_DIR, msg.id, msg.chat_id)
+    if existing:
         return
 
     for attempt in range(1, retries + 1):
@@ -237,12 +263,15 @@ async def safe_send_message(chat_id: int, text: str):
 
 
 async def _copy_to_deleted_dir(msg_id: int, chat_id: int, media) -> Optional[str]:
+    """
+    Ищем источник по префиксу 'msgid_chatid_' в MEDIA_DIR,
+    копируем в MEDIA_DELETED_DIR с тем же именем.
+    """
     os.makedirs(MEDIA_DELETED_DIR, exist_ok=True)
-    fname = get_file_name(media)
-    src = _compose_media_path(MEDIA_DIR, msg_id, chat_id, fname)
-    dst = _compose_media_path(MEDIA_DELETED_DIR, msg_id, chat_id, fname)
-    if not os.path.exists(src):
+    src = _find_media_file(MEDIA_DIR, msg_id, chat_id)
+    if not src:
         return None
+    dst = os.path.join(MEDIA_DELETED_DIR, os.path.basename(src))
     try:
         shutil.copy2(src, dst)
         return dst
@@ -256,6 +285,7 @@ async def _copy_to_deleted_dir(msg_id: int, chat_id: int, media) -> Optional[str
 # =======================================================
 
 async def edited_deleted_handler(event):
+    # ----- РЕДАКТИРОВАНИЕ ТЕКСТА -----
     if isinstance(event, MessageEdited.Event):
         messages = await load_messages_from_event(event)
         if not messages:
@@ -281,7 +311,7 @@ async def edited_deleted_handler(event):
             await safe_send_message(settings.log_chat_id, log_text)
         return
 
-    # ====== УДАЛЕНИЕ / SELF-DESTRUCT ======
+    # ----- УДАЛЕНИЕ / SELF-DESTRUCT -----
     if not isinstance(event, (MessageDeleted.Event, types.UpdateReadMessagesContents)):
         return
 
@@ -301,6 +331,9 @@ async def edited_deleted_handler(event):
                 logging.info(f"Deleted media not found in buffer for msg {message.id} — trying to redownload")
                 try:
                     fresh_msg = await client.get_messages(message.chat_id, ids=message.id)
+                    if not fresh_msg or not getattr(fresh_msg, "media", None):
+                        logging.info(f"Cannot refetch deleted message {message.id} — message already gone from Telegram")
+                        continue
                     await save_media_as_file(fresh_msg)
                     copied_path = await _copy_to_deleted_dir(message.id, message.chat_id, fresh_msg.media)
                 except Exception as e:
@@ -325,6 +358,7 @@ async def edited_deleted_handler(event):
                 logging.exception(f"Failed to send deleted media {copied_path} to log chat: {e}")
             continue
 
+        # Текстовые удалённые
         mention_sender = await create_mention(message.from_id)
         mention_chat = await create_mention(message.chat_id, message.id)
         header = "**Deleted message from:** " + mention_sender + "\n"
@@ -398,7 +432,7 @@ async def init():
     client.add_event_handler(new_message_handler, events.MessageEdited())
     client.add_event_handler(edited_deleted_handler, events.MessageEdited())
     client.add_event_handler(edited_deleted_handler, events.MessageDeleted())
-    client.add_event_handler(edited_deleted_handler)
+    client.add_event_handler(edited_deleted_handler)  # raw UpdateReadMessagesContents
     await housekeeping_loop()
 
 
