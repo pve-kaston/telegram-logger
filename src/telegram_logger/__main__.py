@@ -99,7 +99,7 @@ def _canonical_prefix(msg_id: int) -> str:
 
 def _find_media_file(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
     """
-    Ищет сохранённый файл по каноническому префиксу 'msgid_chatid_'.
+    Ищет сохранённый файл по каноническому префиксу 'msgid_'.
     Возвращает полный путь или None.
     """
     prefix = _canonical_prefix(msg_id)
@@ -139,7 +139,7 @@ async def save_media_as_file(msg: Message, retries: int = 3):
 
     # Название чата в имени файла (как просили), плюс канонический префикс
     chat_name = await _get_entity_name(msg.chat_id or 0)
-    combined_name = f"{_canonical_prefix(msg.id, msg.chat_id)}{chat_name}_{_safe_name(file_name)}"
+    combined_name = f"{_canonical_prefix(msg.id)}{chat_name}_{_safe_name(file_name)}"
     file_path = os.path.join(MEDIA_DIR, combined_name)
 
     # Если уже есть файл с таким префиксом — не дублируем
