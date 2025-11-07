@@ -93,8 +93,8 @@ async def _get_entity_name(entity_id: int) -> str:
     return str(entity_id)
 
 
-def _canonical_prefix(msg_id: int, chat_id: int) -> str:
-    return f"{msg_id}_{chat_id}_"
+def _canonical_prefix(msg_id: int) -> str:
+    return f"{msg_id}_"
 
 
 def _find_media_file(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
@@ -102,7 +102,7 @@ def _find_media_file(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
     Ищет сохранённый файл по каноническому префиксу 'msgid_chatid_'.
     Возвращает полный путь или None.
     """
-    prefix = _canonical_prefix(msg_id, chat_id)
+    prefix = _canonical_prefix(msg_id)
     try:
         for name in os.listdir(base_dir):
             if name.startswith(prefix):
