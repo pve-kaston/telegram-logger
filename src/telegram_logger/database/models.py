@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, TypeAlias
 
-from sqlalchemy import BigInteger, Index, Integer, func
+from sqlalchemy import BigInteger, Index, Integer, func, PrimaryKeyConstraint
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
     AsyncEngine,
@@ -23,9 +23,11 @@ class Base(AsyncAttrs, DeclarativeBase):
 class DbMessage(Base):
     __tablename__ = "messages"
 
-    id: Mapped[int] = mapped_column(primary_key=True, unique=True)
+    # Составной ключ (id + chat_id)
+    id: Mapped[int] = mapped_column(nullable=False)
+    chat_id: Mapped[Int64] = mapped_column(nullable=False)
+
     from_id: Mapped[Int64] = mapped_column()
-    chat_id: Mapped[Int64] = mapped_column()
     type: Mapped[int] = mapped_column()
     msg_text: Mapped[str | None] = mapped_column(nullable=True)
     media: Mapped[bytes] = mapped_column(nullable=True)
@@ -35,7 +37,10 @@ class DbMessage(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     edited_at: Mapped[datetime] = mapped_column(nullable=True)
 
-    __table_args__ = (Index("messages_created_index", created_at.desc()),)
+    __table_args__ = (
+        PrimaryKeyConstraint("id", "chat_id"),
+        Index("messages_created_index", created_at.desc()),
+    )
 
 
 async def register_models() -> None:

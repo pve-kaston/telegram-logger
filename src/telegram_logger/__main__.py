@@ -162,7 +162,7 @@ async def save_media_as_file(msg: Message, retries: int = 3):
             logging.warning(f"Download attempt {attempt} failed for msg {msg.id}: {e}")
         await asyncio.sleep(2)
 
-    logging.error(f"All {retries} download attempts failed for msg {msg.id}")
+    logging.warning(f"All {retries} download attempts failed for msg {msg.id}")
 
 
 # =======================================================
