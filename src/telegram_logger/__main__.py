@@ -57,11 +57,13 @@ def get_file_name(media) -> str:
         return "photo.jpg"
     if isinstance(media, (types.MessageMediaContact, types.Contact)):
         return "contact.vcf"
-    doc = getattr(media, "document", None)
+    doc = media if isinstance(media, types.Document) else getattr(media, "document", None)
     if isinstance(doc, types.Document):
         for attr in getattr(doc, "attributes", []):
             if isinstance(attr, types.DocumentAttributeFilename):
                 return attr.file_name
+            if isinstance(attr, types.DocumentAttributeVideo) and getattr(attr, "round_message", False):
+                return "video_note.mp4"
         mime = getattr(doc, "mime_type", None)
         if mime:
             ext = mime.split("/")[-1]
@@ -117,12 +119,19 @@ def _find_media_file(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
 # =======================================================
 # ============= УЛУЧШЕННАЯ ФУНКЦИЯ СКАЧИВАНИЯ ===========
 # =======================================================
+def _extract_media(message: Message):
+    if not message:
+        return None
+    return message.media or getattr(message, "video_note", None)
+
+
 async def save_media_as_file(msg: Message, retries: int = 3):
     """
     Скачиавет медиа и сохраняет файл как:
     {msg.id}_{msg.chat_id}_{chat_name}_{original_name}
     """
-    if not msg or not msg.media:
+    media = _extract_media(msg)
+    if not msg or not media:
         return
 
     try:
@@ -135,7 +144,7 @@ async def save_media_as_file(msg: Message, retries: int = 3):
         return
 
     os.makedirs(MEDIA_DIR, exist_ok=True)
-    file_name = get_file_name(msg.media)
+    file_name = get_file_name(media)
 
     # Название чата в имени файла (как просили), плюс канонический префикс
     chat_name = await _get_entity_name(msg.chat_id or 0)
@@ -149,7 +158,7 @@ async def save_media_as_file(msg: Message, retries: int = 3):
 
     for attempt in range(1, retries + 1):
         try:
-            await client.download_media(msg.media, file_path)
+            await client.download_media(media, file_path)
             logging.info(f"Downloaded media (attempt {attempt}) for msg {msg.id}")
             return
         except (FileReferenceExpiredError, FileMigrateError):
@@ -193,14 +202,15 @@ async def new_message_handler(event: Union[NewMessage.Event, MessageEdited.Event
     noforwards = getattr(event.chat, "noforwards", False)
     self_destructing = bool(getattr(event.message.media, "ttl_seconds", None))
 
-    if event.message.media:
+    media = _extract_media(event.message)
+    if media:
         await save_media_as_file(event.message)
 
     if isinstance(event, MessageEdited.Event):
         edited_at = datetime.now(timezone.utc)
 
     if not await message_exists(msg_id):
-        media_blob = pickle.dumps(event.message.media) if event.message.media else None
+        media_blob = pickle.dumps(media) if media else None
         await save_message(
             msg_id=msg_id,
             from_id=from_id,
