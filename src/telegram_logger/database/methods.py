@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import List, Union
 
 from sqlalchemy import and_, delete, or_, select
+from sqlalchemy.exc import OperationalError
 from telethon.events import MessageDeleted, MessageEdited
 from telethon.tl.types import UpdateReadMessagesContents
 
@@ -11,9 +12,12 @@ from telegram_logger.settings import settings
 from telegram_logger.tg_types import ChatType
 
 
-async def message_exists(msg_id: int) -> bool:
+async def message_exists(msg_id: int, chat_id: int) -> bool:
     async with async_session() as session:
-        query = select(DbMessage.id).where(DbMessage.id == msg_id)
+        query = select(DbMessage.id).where(
+            DbMessage.id == msg_id,
+            DbMessage.chat_id == chat_id,
+        )
         return bool((await session.execute(query)).scalar())
 
 
@@ -44,7 +48,11 @@ async def save_message(
 
     async with async_session() as session:
         session.add(message)
-        await session.commit()
+        try:
+            await session.commit()
+        except OperationalError as exc:
+            await session.rollback()
+            logging.error("Failed to save message %s/%s: %s", chat_id, msg_id, exc)
 
 
 async def get_message_ids_by_event(

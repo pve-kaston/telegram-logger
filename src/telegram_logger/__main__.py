@@ -95,22 +95,26 @@ async def _get_entity_name(entity_id: int) -> str:
     return str(entity_id)
 
 
-def _canonical_prefix(msg_id: int) -> str:
-    return f"{msg_id}_"
+def _canonical_prefix(msg_id: int, chat_id: int) -> str:
+    return f"{chat_id}_{msg_id}_"
 
 
 def _find_media_file(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
     """
-    Ищет сохранённый файл по каноническому префиксу 'msgid_'.
+    Ищет сохранённый файл по каноническому префиксу 'chatid_msgid_'.
+    Для совместимости также ищет по старому префиксу 'msgid_'.
     Возвращает полный путь или None.
     """
-    prefix = _canonical_prefix(msg_id)
+    prefixes = (
+        _canonical_prefix(msg_id, chat_id),
+        f"{msg_id}_",
+    )
     try:
         for name in os.listdir(base_dir):
-            if name.startswith(prefix):
-                path = os.path.join(base_dir, name)
-                if os.path.isfile(path):
-                    return path
+            if not os.path.isfile(os.path.join(base_dir, name)):
+                continue
+            if any(name.startswith(prefix) for prefix in prefixes):
+                return os.path.join(base_dir, name)
     except FileNotFoundError:
         return None
     return None
@@ -128,7 +132,7 @@ def _extract_media(message: Message):
 async def save_media_as_file(msg: Message, retries: int = 3):
     """
     Скачиавет медиа и сохраняет файл как:
-    {msg.id}_{msg.chat_id}_{chat_name}_{original_name}
+    {msg.chat_id}_{msg.id}_{chat_name}_{original_name}
     """
     media = _extract_media(msg)
     if not msg or not media:
@@ -148,11 +152,11 @@ async def save_media_as_file(msg: Message, retries: int = 3):
 
     # Название чата в имени файла (как просили), плюс канонический префикс
     chat_name = await _get_entity_name(msg.chat_id or 0)
-    combined_name = f"{_canonical_prefix(msg.id)}{chat_name}_{_safe_name(file_name)}"
+    combined_name = f"{_canonical_prefix(msg.id, msg.chat_id or 0)}{chat_name}_{_safe_name(file_name)}"
     file_path = os.path.join(MEDIA_DIR, combined_name)
 
     # Если уже есть файл с таким префиксом — не дублируем
-    existing = _find_media_file(MEDIA_DIR, msg.id, msg.chat_id)
+    existing = _find_media_file(MEDIA_DIR, msg.id, msg.chat_id or 0)
     if existing:
         return
 
@@ -191,7 +195,7 @@ def get_sender_id(message) -> int:
 
 
 async def new_message_handler(event: Union[NewMessage.Event, MessageEdited.Event]):
-    chat_id = event.chat_id
+    chat_id = event.chat_id or 0
     from_id = get_sender_id(event.message)
     msg_id = event.message.id
 
@@ -209,28 +213,37 @@ async def new_message_handler(event: Union[NewMessage.Event, MessageEdited.Event
     if isinstance(event, MessageEdited.Event):
         edited_at = datetime.now(timezone.utc)
 
-    if not await message_exists(msg_id):
+    if not await message_exists(msg_id, chat_id):
         media_blob = pickle.dumps(media) if media else None
-        await save_message(
-            msg_id=msg_id,
-            from_id=from_id,
-            chat_id=chat_id,
-            type=(await get_chat_type(event)).value,
-            msg_text=event.message.text,
-            media=media_blob,
-            noforwards=noforwards,
-            self_destructing=self_destructing,
-            created_at=datetime.now(timezone.utc),
-            edited_at=edited_at,
-        )
+        try:
+            await save_message(
+                msg_id=msg_id,
+                from_id=from_id,
+                chat_id=chat_id,
+                type=(await get_chat_type(event)).value,
+                msg_text=event.message.text,
+                media=media_blob,
+                noforwards=noforwards,
+                self_destructing=self_destructing,
+                created_at=datetime.now(timezone.utc),
+                edited_at=edited_at,
+            )
+        except Exception as exc:
+            logging.error("Failed to persist message %s/%s: %s", chat_id, msg_id, exc)
+
+
+def _limit_ids(ids: List[int], limit: int) -> List[int]:
+    if limit <= 0:
+        return ids
+    return ids[:limit]
 
 
 async def load_messages_from_event(event) -> List[DbMessage]:
     ids: List[int] = []
     if isinstance(event, MessageDeleted.Event):
-        ids = event.deleted_ids[: settings.rate_limit_num_messages]
+        ids = _limit_ids(event.deleted_ids, settings.max_deleted_messages_per_event)
     elif isinstance(event, types.UpdateReadMessagesContents):
-        ids = event.messages[: settings.rate_limit_num_messages]
+        ids = _limit_ids(event.messages, settings.rate_limit_num_messages)
     elif isinstance(event, MessageEdited.Event):
         ids = [event.message.id]
     db_results = await get_message_ids_by_event(event, ids)
@@ -269,12 +282,15 @@ async def safe_send_message(chat_id: int, text: str):
     if not text or len(text) > MAX_LEN:
         logging.warning("Skipped sending message: too long")
         return
-    await client.send_message(chat_id, text)
+    try:
+        await client.send_message(chat_id, text)
+    except Exception as e:
+        logging.warning(f"Failed to send message to {chat_id}: {e}")
 
 
 async def _copy_to_deleted_dir(msg_id: int, chat_id: int, media) -> Optional[str]:
     """
-    Ищем источник по префиксу 'msgid_chatid_' в MEDIA_DIR,
+    Ищем источник по префиксу 'chatid_msgid_' в MEDIA_DIR,
     копируем в MEDIA_DELETED_DIR с тем же именем.
     """
     os.makedirs(MEDIA_DELETED_DIR, exist_ok=True)
