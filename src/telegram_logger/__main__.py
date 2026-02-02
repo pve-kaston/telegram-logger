@@ -98,7 +98,6 @@ async def _get_entity_name(entity_id: int) -> str:
 def _canonical_prefix(msg_id: int, chat_id: int) -> str:
     return f"{chat_id}_{msg_id}_"
 
-
 async def _friendly_filename(chat_id: int, fallback_name: str) -> str:
     chat_name = await _get_entity_name(chat_id)
     base_name = fallback_name
