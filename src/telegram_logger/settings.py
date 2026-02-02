@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     debug_mode: bool = False
     rate_limit_num_messages: int = 5
+    max_deleted_messages_per_event: int = 0
     @property
     def RATE_LIMIT_NUM_MESSAGES(self):
         return self.rate_limit_num_messages
