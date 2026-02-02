@@ -98,6 +98,19 @@ async def _get_entity_name(entity_id: int) -> str:
 def _canonical_prefix(msg_id: int, chat_id: int) -> str:
     return f"{chat_id}_{msg_id}_"
 
+async def _friendly_filename(chat_id: int, fallback_name: str) -> str:
+    chat_name = await _get_entity_name(chat_id)
+    base_name = fallback_name
+    parts = fallback_name.split("_", 2)
+    if len(parts) >= 3 and parts[0].lstrip("-").isdigit() and parts[1].isdigit():
+        base_name = parts[2]
+    elif len(parts) >= 2 and parts[0].isdigit():
+        base_name = parts[1]
+    safe_name = _safe_name(base_name)
+    if not safe_name:
+        safe_name = "file.bin"
+    return f"{chat_name}_{safe_name}"
+
 
 def _find_media_file(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
     """
@@ -150,9 +163,8 @@ async def save_media_as_file(msg: Message, retries: int = 3):
     os.makedirs(MEDIA_DIR, exist_ok=True)
     file_name = get_file_name(media)
 
-    # Название чата в имени файла (как просили), плюс канонический префикс
-    chat_name = await _get_entity_name(msg.chat_id or 0)
-    combined_name = f"{_canonical_prefix(msg.id, msg.chat_id or 0)}{chat_name}_{_safe_name(file_name)}"
+    # Канонический префикс нужен для поиска, остальная часть — человекочитаемая
+    combined_name = f"{_canonical_prefix(msg.id, msg.chat_id or 0)}{await _friendly_filename(msg.chat_id or 0, file_name)}"
     file_path = os.path.join(MEDIA_DIR, combined_name)
 
     # Если уже есть файл с таким префиксом — не дублируем
@@ -367,6 +379,10 @@ async def edited_deleted_handler(event):
             if not copied_path:
                 continue
             try:
+                caption = (message.msg_text or "").strip()
+                if caption:
+                    caption = f"**Deleted media caption:**\n{caption}"
+                filename = await _friendly_filename(message.chat_id, os.path.basename(copied_path))
                 with open(copied_path, "rb") as fh:
                     uploaded = await client.upload_file(fh)
                 await client(
@@ -375,9 +391,9 @@ async def edited_deleted_handler(event):
                         media=types.InputMediaUploadedDocument(
                             file=uploaded,
                             mime_type="application/octet-stream",
-                            attributes=[types.DocumentAttributeFilename(file_name=os.path.basename(copied_path))],
+                            attributes=[types.DocumentAttributeFilename(file_name=filename)],
                         ),
-                        message="",
+                        message=caption,
                     )
                 )
             except Exception as e:
