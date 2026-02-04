@@ -142,6 +142,19 @@ def _extract_media(message: Message):
     return message.media or getattr(message, "video_note", None)
 
 
+def _is_gif(message: Message) -> bool:
+    media = _extract_media(message)
+    doc = media if isinstance(media, types.Document) else getattr(media, "document", None)
+    if not isinstance(doc, types.Document):
+        return False
+    mime = getattr(doc, "mime_type", "") or ""
+    if mime.lower() == "image/gif":
+        return True
+    for attr in getattr(doc, "attributes", []):
+        if isinstance(attr, types.DocumentAttributeAnimated):
+            return True
+    return False
+
 async def save_media_as_file(msg: Message, retries: int = 3):
     """
     Скачиавет медиа и сохраняет файл как:
@@ -221,6 +234,16 @@ async def new_message_handler(event: Union[NewMessage.Event, MessageEdited.Event
     media = _extract_media(event.message)
     if media:
         await save_media_as_file(event.message)
+        if (
+            event.out
+            and settings.delete_sent_gifs_from_saved
+            and chat_id == MY_ID
+            and _is_gif(event.message)
+        ):
+            try:
+                await client.delete_messages(chat_id, [msg_id])
+            except Exception as exc:
+                logging.warning("Failed to delete sent GIF %s/%s: %s", chat_id, msg_id, exc)
 
     if isinstance(event, MessageEdited.Event):
         edited_at = datetime.now(timezone.utc)
