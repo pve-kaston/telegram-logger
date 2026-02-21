@@ -1,74 +1,25 @@
-# Logger Service
+# telegram-logger
 
-Сервис для логирования удалённых медиа и сообщений из Telegram личных чатов и групп (в будущем и каналов).
+Refactored Telethon logger service with layered architecture:
 
-## Установка
+- `telegram_logger/main.py` bootstrap + handler wiring
+- `telegram_logger/settings.py` centralized env-based settings
+- `telegram_logger/db/*` async repository + models
+- `telegram_logger/storage/*` plaintext buffer + encrypted deleted media storage (`.enc` + `.sha256`)
+- `telegram_logger/handlers/*` new/edited/deleted/restricted link handlers
+- `telegram_logger/health/*` healthcheck + housekeeping beats
 
-Клонируем репозиторий и выполняем команду
+## Minimal env
 
-`make install`
-
-Команда создаст пользователя, права и скопирует файлы.
-
----
-
-## Настройка
-
-Редактируем файл окружения по примеру:
-
-`sudo nano /etc/logger/.env`
-
-### Пример `.env`
-
-```
-# Telegram credentials
-API_ID=12345678
-API_HASH="ljgewlrgwkfnewigwud234gwef"
-SESSION_NAME="db/user.session"
-
-# Chat where all deleted messages will be dumped
-LOG_CHAT_ID=-1234567890
-IGNORED_IDS=[]
-
-# Message sending settings
-LISTEN_OUTGOING_MESSAGES=FALSE
-SAVE_EDITED_MESSAGES=True
-DELETE_SENT_GIFS_FROM_SAVED=True
-DELETE_SENT_STICKERS_FROM_SAVED=True
-
-# Limits
-MAX_IN_MEMORY_FILE_SIZE=5242880
-
-# SQLite config
-SQLITE_DB_FILE="db/messages.db"
-PERSIST_TIME_IN_DAYS_BOT=1
-PERSIST_TIME_IN_DAYS_USER=1
-PERSIST_TIME_IN_DAYS_CHANNEL=1
-PERSIST_TIME_IN_DAYS_GROUP=1
-
-# Debug / Rate limit
-DEBUG_MODE=0
-RATE_LIMIT_NUM_MESSAGES=5
-MAX_DELETED_MESSAGES_PER_EVENT=0
+```env
+API_ID=12345
+API_HASH=xxxxx
+LOG_CHAT_ID=-100000000000
+DELETED_MEDIA_KEY_B64=<32-byte-key-base64>
 ```
 
----
+Run with:
 
-## Подготовка `user.session`
-
-1. Вручную запустите Python скрипт и пройдите авторизацию в телеграмм аккаунт.
-2. Переместите созданный `user.session` файл в директорию `/opt/logger/db/user.session`
-
-  `sudo cp src/db/user.session /opt/logger/db/user.session`
-
----
-
-## Запуск
-
-Выполните команду для запуска сервиса
-
-`make start`
-
-А так же для проверки состояния сервиса
-
-`make status`
+```bash
+python -m telegram_logger
+```
