@@ -1,5 +1,6 @@
 Telethon>=1.40.0,<2.0
 cryptg>=0.5.0,<1.0
+cryptography>=43.0.0,<45.0
 pyAesCrypt>=6.1.1,<7.0
 SQLAlchemy>=2.0.25,<2.1
 greenlet>=3.0
