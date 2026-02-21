@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 import tempfile
 from pathlib import Path
@@ -25,10 +26,12 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
-async def save_restricted_msg(link: str, client: TelegramClient):
+async def save_restricted_msg(link: str, client: TelegramClient, buffer_storage: PlaintextBufferStorage):
     chat_id = None
     msg_id = None
+
     if link.startswith("tg://"):
+        # tg://openmessage?user_id=<id>&message_id=<id>
         parts = [int(v) for v in re.findall(r"\d+", link)]
         if len(parts) == 2:
             chat_id, msg_id = parts
@@ -59,15 +62,27 @@ async def save_restricted_msg(link: str, client: TelegramClient):
     if not msg:
         return
     if msg.media:
+        local_path = None
+        try:
+            # Ensure restricted saves are persisted in local media buffer too.
+            local_path = await buffer_storage.buffer_save(msg)
+        except Exception:
+            logging.exception("Failed to persist restricted media to buffer for link %s", link)
+        if not local_path:
+            local_path = buffer_storage.buffer_find(msg.id, getattr(msg, "chat_id", None) or chat_id or 0)
+
         try:
             await client.send_file("me", msg.media, caption=msg.text or "")
         except ChatForwardsRestrictedError:
             # Protected chats disallow forwarding media by reference.
             # Re-upload after downloading the payload.
-            suffix = Path(getattr(getattr(msg, "file", None), "name", "") or "").suffix or ".bin"
-            with tempfile.NamedTemporaryFile("wb", suffix=suffix, delete=True) as tmp:
-                await client.download_media(msg.media, file=tmp.name)
-                await client.send_file("me", tmp.name, caption=msg.text or "")    
+            if local_path and os.path.exists(local_path):
+                await client.send_file("me", local_path, caption=msg.text or "")
+            else:
+                suffix = Path(getattr(getattr(msg, "file", None), "name", "") or "").suffix or ".bin"
+                with tempfile.NamedTemporaryFile("wb", suffix=suffix, delete=True) as tmp:
+                    await client.download_media(msg.media, file=tmp.name)
+                    await client.send_file("me", tmp.name, caption=msg.text or "")
     elif msg.text:
         await client.send_message("me", msg.text)
 
@@ -118,7 +133,7 @@ async def run(client: TelegramClient):
             buffer_storage,
             settings,
             my_id,
-            lambda link: save_restricted_msg(link, client),
+            lambda link: save_restricted_msg(link, client, buffer_storage),
         ),
         events.NewMessage(incoming=True, outgoing=settings.listen_outgoing_messages),
     )
@@ -130,7 +145,7 @@ async def run(client: TelegramClient):
             buffer_storage,
             settings,
             my_id,
-            lambda link: save_restricted_msg(link, client),
+            lambda link: save_restricted_msg(link, client, buffer_storage),
         ),
         events.MessageEdited(),
     )
