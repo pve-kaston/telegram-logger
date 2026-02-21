@@ -43,6 +43,9 @@ def _payload() -> dict:
 
 
 class _HealthHandler(BaseHTTPRequestHandler):
+    def log_message(self, *_) -> None:
+        pass
+
     def _serve(self):
         body = json.dumps(_payload()).encode("utf-8")
         code = 200 if _is_healthy(datetime.now(timezone.utc)) else 503
