@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     api_hash: SecretStr
     session_name: str = "db/user.session"
 
+    health_path: str = "/health"
+    health_port: int = 8080
+    health_error_window_secs: int = 300
+    health_housekeeping_stale_secs: int = 900
+
     log_chat_id: int
     ignored_ids: set[int] = Field(default_factory=set)
     

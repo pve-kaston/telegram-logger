@@ -1,7 +1,7 @@
 # telegram_logger/health.py
 import json
 import logging
-import os
+from telegram_logger.settings import settings
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timezone
@@ -14,10 +14,11 @@ LAST_ERROR_AT: Optional[datetime] = None
 LAST_ERROR_MSG: Optional[str] = None
 
 # --- config (через ENV можно переопределить) ---
-HEALTH_PATH = os.getenv("HEALTH_PATH", "/health")
-HEALTH_PORT = int(os.getenv("HEALTH_PORT", "8080"))
-ERROR_WINDOW_SECS = int(os.getenv("HEALTH_ERROR_WINDOW_SECS", "300"))          # 5 мин
-HOUSEKEEPING_STALE_SECS = int(os.getenv("HEALTH_HOUSEKEEPING_STALE_SECS", "900"))  # 15 мин
+
+HEALTH_PATH = settings.health_path
+HEALTH_PORT = settings.health_port
+ERROR_WINDOW_SECS = settings.health_error_window_secs
+HOUSEKEEPING_STALE_SECS = settings.health_housekeeping_stale_secs
 
 # --- hook на ошибки логгера ---
 class _ErrorFlagHandler(logging.Handler):

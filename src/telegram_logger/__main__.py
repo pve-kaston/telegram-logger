@@ -477,7 +477,6 @@ async def housekeeping_loop():
             logging.warning(f"purge_expired_media_files failed: {e}")
         await asyncio.sleep(300)
 
-
 async def init():
     global MY_ID
     os.makedirs("db", exist_ok=True)

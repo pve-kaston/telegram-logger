@@ -184,7 +184,7 @@ cython_debug/
 
 # Data
 .tests/
-db/
-media/*
+**/db/
+**/media/
 *.db
 *.session

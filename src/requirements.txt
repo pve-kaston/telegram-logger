@@ -2,6 +2,7 @@ Telethon>=1.40.0,<2.0
 cryptg>=0.5.0,<1.0
 pyAesCrypt>=6.1.1,<7.0
 SQLAlchemy>=2.0.25,<2.1
+greenlet>=3.0
 aiosqlite>=0.22.1,<1.0
 pydantic>=2.12.2,<3.0
 pydantic_settings>=2.12.0,<3.0
