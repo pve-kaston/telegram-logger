@@ -36,14 +36,11 @@ async def save_restricted_msg(link: str, client: TelegramClient, buffer_storage:
         if len(parts) == 2:
             chat_id, msg_id = parts
     else:
-        # https://t.me/c/<internal_channel_id>/<message_id>
-        # must be converted to -100<internal_channel_id> for Telethon.
         m = re.search(r"t\.me/c/(\d+)/(\d+)", link)
         if m:
             chat_id = int(f"-100{m.group(1)}")
             msg_id = int(m.group(2))
         else:
-            # fallback for public links like t.me/<username>/<message_id>
             parts = link.rstrip("/").split("/")
             if len(parts) >= 2:
                 msg_id = int(parts[-1])

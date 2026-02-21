@@ -103,8 +103,6 @@ async def edited_deleted_handler(event, client, db, buffer_storage, deleted_stor
         if row.from_id in settings.ignored_ids or row.chat_id in settings.ignored_ids:
             continue
 
-        # UpdateReadMessagesContents also fires for voice-note listened/read state changes.
-        # We should log only true self-destruct events.
         if isinstance(event, types.UpdateReadMessagesContents) and not row.self_destructing:
             continue
 
