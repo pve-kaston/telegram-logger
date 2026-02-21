@@ -1,6 +1,9 @@
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+from telethon.tl import types
 
 
 def canonical_prefix(msg_id: int, chat_id: int) -> str:
@@ -19,6 +22,34 @@ def find_by_prefix(base_dir: str, msg_id: int, chat_id: int) -> Optional[str]:
     return None
 
 
+def _safe_name(name: str) -> str:
+    safe = re.sub(r"[^\w\-. ()\[\]{}@,+=]", "_", name or "")
+    return safe or "file.bin"
+
+
+def _guess_filename_from_media(media) -> str:
+    if not media:
+        return "file.bin"
+    if isinstance(media, (types.MessageMediaPhoto, types.Photo)):
+        return "photo.jpg"
+    if isinstance(media, (types.MessageMediaContact, types.Contact)):
+        return "contact.vcf"
+
+    doc = media if isinstance(media, types.Document) else getattr(media, "document", None)
+    if isinstance(doc, types.Document):
+        for attr in getattr(doc, "attributes", []):
+            if isinstance(attr, types.DocumentAttributeFilename) and getattr(attr, "file_name", None):
+                return _safe_name(attr.file_name)
+            if isinstance(attr, types.DocumentAttributeVideo) and getattr(attr, "round_message", False):
+                return "video_note.mp4"
+
+        mime = getattr(doc, "mime_type", None)
+        if mime and "/" in mime:
+            return f"file.{mime.split('/')[-1]}"
+
+    return "file.bin"
+
+
 class PlaintextBufferStorage:
     def __init__(self, client, media_dir: str, max_buffer_size: int):
         self.client = client
@@ -27,6 +58,19 @@ class PlaintextBufferStorage:
 
     def buffer_find(self, msg_id: int, chat_id: int) -> Optional[str]:
         return find_by_prefix(self.media_dir, msg_id, chat_id)
+
+    async def _friendly_name(self, chat_id: int, base_file_name: str) -> str:
+        try:
+            entity = await self.client.get_entity(chat_id)
+            chat_name = (
+                getattr(entity, "username", None)
+                or getattr(entity, "title", None)
+                or "_".join(filter(None, [getattr(entity, "first_name", None), getattr(entity, "last_name", None)]))
+                or str(chat_id)
+            )
+        except Exception:
+            chat_name = str(chat_id)
+        return f"{_safe_name(chat_name)}_{_safe_name(base_file_name)}"
 
     async def buffer_save(self, message) -> Optional[str]:
         media = message.media or getattr(message, "video_note", None)
@@ -42,9 +86,12 @@ class PlaintextBufferStorage:
             return None
 
         chat_id = message.chat_id or 0
-        path = os.path.join(self.media_dir, f"{canonical_prefix(message.id, chat_id)}file.bin")
         if self.buffer_find(message.id, chat_id):
             return None
+
+        original_name = _guess_filename_from_media(media)
+        human_name = await self._friendly_name(chat_id, original_name)
+        path = os.path.join(self.media_dir, f"{canonical_prefix(message.id, chat_id)}{human_name}")
 
         await self.client.download_media(media, path)
         return path
