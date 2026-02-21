@@ -43,6 +43,9 @@ def _payload() -> dict:
 
 
 class _HealthHandler(BaseHTTPRequestHandler):
+    def log_message(self, *_) -> None:
+        pass
+    
     def _serve(self):
         body = json.dumps(_payload()).encode("utf-8")
         code = 200 if _is_healthy(datetime.now(timezone.utc)) else 503
@@ -68,3 +71,4 @@ def setup_healthcheck() -> None:
     server = ThreadingHTTPServer(("0.0.0.0", settings.health_port), _HealthHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="health-http")
     thread.start()
+    logging.getLogger("health").info("Health endpoint on 0.0.0.0:%s%s", settings.health_port, settings.health_path)
