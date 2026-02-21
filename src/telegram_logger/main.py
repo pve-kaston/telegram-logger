@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from telethon import TelegramClient, events
 
-from telegram_logger.db.repo import MessageRepository
+from telegram_logger.database import MessageRepository
 from telegram_logger.handlers.edited_deleted import edited_deleted_handler
 from telegram_logger.handlers.new_message import new_message_handler
 from telegram_logger.health.beats import beat_housekeeping
