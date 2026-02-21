@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import List, Union
 
 from sqlalchemy import and_, delete, or_, select
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from telethon.events import MessageDeleted, MessageEdited
 from telethon.tl.types import UpdateReadMessagesContents
 
@@ -50,6 +50,10 @@ async def save_message(
         session.add(message)
         try:
             await session.commit()
+        except IntegrityError:
+            # duplicate (id, chat_id) races can happen under concurrent update delivery
+            await session.rollback()
+            logging.debug("Duplicate message ignored %s/%s", chat_id, msg_id)
         except OperationalError as exc:
             await session.rollback()
             logging.error("Failed to save message %s/%s: %s", chat_id, msg_id, exc)
