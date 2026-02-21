@@ -103,6 +103,9 @@ async def edited_deleted_handler(event, client, db, buffer_storage, deleted_stor
         if row.from_id in settings.ignored_ids or row.chat_id in settings.ignored_ids:
             continue
 
+        if isinstance(event, types.UpdateReadMessagesContents) and not row.self_destructing:
+            continue
+
         if row.media:
             src = buffer_storage.buffer_find(row.id, row.chat_id)
             if not src:
