@@ -1,9 +1,12 @@
 import asyncio
 import logging
 import re
+import tempfile
+from pathlib import Path
 from datetime import datetime, timezone
 
 from telethon import TelegramClient, events
+from telethon.errors import ChatForwardsRestrictedError
 
 from telegram_logger.database import MessageRepository
 from telegram_logger.handlers.edited_deleted import edited_deleted_handler
@@ -56,7 +59,15 @@ async def save_restricted_msg(link: str, client: TelegramClient):
     if not msg:
         return
     if msg.media:
-        await client.send_file("me", msg.media, caption=msg.text or "")
+        try:
+            await client.send_file("me", msg.media, caption=msg.text or "")
+        except ChatForwardsRestrictedError:
+            # Protected chats disallow forwarding media by reference.
+            # Re-upload after downloading the payload.
+            suffix = Path(getattr(getattr(msg, "file", None), "name", "") or "").suffix or ".bin"
+            with tempfile.NamedTemporaryFile("wb", suffix=suffix, delete=True) as tmp:
+                await client.download_media(msg.media, file=tmp.name)
+                await client.send_file("me", tmp.name, caption=msg.text or "")    
     elif msg.text:
         await client.send_message("me", msg.text)
 
