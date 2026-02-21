@@ -23,17 +23,36 @@ def utcnow():
 
 
 async def save_restricted_msg(link: str, client: TelegramClient):
+    chat_id = None
+    msg_id = None
     if link.startswith("tg://"):
         parts = [int(v) for v in re.findall(r"\d+", link)]
-        if len(parts) != 2:
-            return
-        chat_id, msg_id = parts
+        if len(parts) == 2:
+            chat_id, msg_id = parts
     else:
-        parts = link.split("/")
-        msg_id = int(parts[-1])
-        chat_id = int(parts[-2]) if parts[-2].isdigit() else parts[-2]
+        m = re.search(r"t\.me/c/(\d+)/(\d+)", link)
+        if m:
+            chat_id = int(f"-100{m.group(1)}")
+            msg_id = int(m.group(2))
+        else:
+            parts = link.rstrip("/").split("/")
+            if len(parts) >= 2:
+                msg_id = int(parts[-1])
+                chat_id = int(parts[-2]) if parts[-2].isdigit() else parts[-2]
 
-    msg = await client.get_messages(chat_id, ids=msg_id)
+    if chat_id is None or msg_id is None:
+        logging.warning("Could not parse restricted link: %s", link)
+        return
+
+    try:
+        msg = await client.get_messages(chat_id, ids=msg_id)
+    except ValueError as exc:
+        logging.warning("Could not resolve entity for restricted link %s: %s", link, exc)
+        return
+    except Exception:
+        logging.exception("Failed to fetch restricted link %s", link)
+        return
+
     if not msg:
         return
     if msg.media:
