@@ -1,4 +1,5 @@
 import json
+import sys
 import logging
 import threading
 from datetime import datetime, timezone
@@ -71,4 +72,4 @@ def setup_healthcheck() -> None:
     server = ThreadingHTTPServer(("0.0.0.0", settings.health_port), _HealthHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True, name="health-http")
     thread.start()
-    print("Health endpoint on 0.0.0.0:%s%s" % (settings.health_port, settings.health_path), flush=True)
+    print("Health endpoint on 0.0.0.0:%s%s" % (settings.health_port, settings.health_path), file=sys.stderr, flush=True)
