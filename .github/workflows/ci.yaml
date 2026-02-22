@@ -26,8 +26,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/telegram-logger
-
+  IMAGE_NAME: ${{ github.repository }}
+  
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -39,7 +39,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
 
     steps:
       - name: Checkout

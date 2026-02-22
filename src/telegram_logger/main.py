@@ -7,7 +7,7 @@ from telethon import TelegramClient, events
 from telegram_logger.database import MessageRepository
 from telegram_logger.handlers.edited_deleted import edited_deleted_handler
 from telegram_logger.handlers.new_message import new_message_handler
-from telegram_logger.handlers.restricted_saver import save_restricted_msg
+from telegram_logger.handlers.restricted_saver import maybe_handle_restricted_link, save_restricted_msg
 from telegram_logger.health.beats import beat_housekeeping
 from telegram_logger.health.healthcheck import setup_healthcheck
 from telegram_logger.settings import get_settings
@@ -97,5 +97,16 @@ async def run(client: TelegramClient):
     client.add_event_handler(
         lambda e: edited_deleted_handler(e, client, db, buffer_storage, deleted_storage, settings, my_id)
     )
+
+    if not settings.listen_outgoing_messages:
+        client.add_event_handler(
+            lambda e: maybe_handle_restricted_link(
+                e,
+                settings,
+                my_id,
+                lambda link: save_restricted_msg(link, client, buffer_storage, settings.log_chat_id),
+            ),
+            events.NewMessage(outgoing=True),
+        )
 
     await housekeeping_loop(db, buffer_storage, settings.media_buffer_ttl_hours)
