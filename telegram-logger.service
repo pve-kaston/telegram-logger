@@ -2,6 +2,8 @@
 Description=Telegram logger service
 Wants=network-online.target
 After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 [Service]
 User=telegram_logger
