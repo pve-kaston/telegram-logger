@@ -1,13 +1,13 @@
 [Unit]
-Description=Telegram Delete Logger (telethon)
+Description=Telegram logger service
 Wants=network-online.target
 After=network-online.target
 
 [Service]
-User=logger
-Group=logger
-WorkingDirectory=/opt/logger
-EnvironmentFile=/etc/logger/.env
+User=telegram_logger
+Group=telegram_logger
+WorkingDirectory=/opt/telegram_logger
+EnvironmentFile=/etc/telegram_logger/.env
 ExecStart=/usr/bin/python3 -m telegram_logger
 Restart=on-failure
 RestartSec=5
