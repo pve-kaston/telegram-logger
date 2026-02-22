@@ -1,0 +1,14 @@
+services:
+  telegram-logger:
+    container_name: telegram-logger
+    image: ghcr.io/pve-kaston/telegram-logger:latest
+    env_file: .env
+    volumes:
+      - /data:/data
+    restart: unless-stopped
+    healthcheck: 
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
