@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     api_id: int
     api_hash: SecretStr
-    session_name: str = "db/user.session"
+    session_name: str = "data/user.session"
 
     log_chat_id: int
     ignored_ids: set[int] = Field(default_factory=set)
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     delete_sent_gifs_from_saved: bool = True
     delete_sent_stickers_from_saved: bool = True
 
-    sqlite_db_file: Path = Path("db/messages.db")
+    sqlite_db_file: Path = Path("data/messages.db")
     persist_time_in_days_bot: int = 1
     persist_time_in_days_user: int = 1
     persist_time_in_days_channel: int = 1

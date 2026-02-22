@@ -94,7 +94,7 @@ async def _safe_send(client, chat_id: int, text: str, limit: int = 4096):
         return
     if len(text) > limit:
         text = text[: limit - 3] + "..."
-    await client.send_message(chat_id, text, parse_mode="md")
+    await client.send_message(chat_id, text, parse_mode="md", link_preview=False)
 
 async def _refetch_message(client, chat_id: int, msg_id: int):
     try:
@@ -119,6 +119,7 @@ async def _send_deleted_file(
         parse_mode="md",
         attributes=[types.DocumentAttributeFilename(file_name=filename)],
         force_document=True,
+        link_preview=False,
         )
 
 
