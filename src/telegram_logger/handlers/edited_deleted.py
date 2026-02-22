@@ -1,4 +1,5 @@
 from __future__ import annotations
+from contextlib import suppress
 
 import os
 import re
@@ -19,11 +20,9 @@ def _escape_md_label(text: str) -> str:
     return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
 def _remove_file_quietly(path: str) -> None:
-    try:
-        if path and os.path.exists(path):
+    if path:
+        with suppress(FileNotFoundError):
             os.remove(path)
-    except Exception:
-        pass
 
 def _ids_from_event(event, limit: int) -> list[int]:
     if isinstance(event, events.MessageDeleted.Event):

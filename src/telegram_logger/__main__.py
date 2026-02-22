@@ -1,6 +1,5 @@
 import asyncio
 from telethon import TelegramClient
-from pathlib import Path
 
 from telegram_logger.main import run
 from telegram_logger.settings import settings

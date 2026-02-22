@@ -6,15 +6,20 @@ from typing import BinaryIO, Optional, Protocol
 
 
 class MediaStorage(Protocol):
-    async def buffer_save(self, message) -> Optional[str]: ...
+    async def buffer_save(self, message) -> Optional[str]:
+        pass
 
-    def buffer_find(self, msg_id: int, chat_id: int) -> Optional[str]: ...
+    def buffer_find(self, msg_id: int, chat_id: int) -> Optional[str]:
+        pass
 
-    async def deleted_put_from_buffer(self, src_path: str) -> Optional[str]: ...
+    async def deleted_put_from_buffer(self, src_path: str) -> Optional[str]:
+        pass
 
-    def deleted_open_for_upload(self, enc_path: str) -> BinaryIO: ...
+    def deleted_open_for_upload(self, enc_path: str) -> BinaryIO:
+        pass
 
-    async def purge_buffer_ttl(self, now: datetime) -> None: ...
+    async def purge_buffer_ttl(self, now: datetime) -> None:
+        pass
 
 
 @dataclass(frozen=True)
