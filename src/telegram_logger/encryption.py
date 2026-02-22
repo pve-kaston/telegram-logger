@@ -7,9 +7,6 @@ from telegram_logger.settings import settings
 
 BUFFER_SIZE = 1024 * 1024
 
-# this is meant to be more about obfuscation and less about security
-
-
 @contextmanager
 def encrypted(file_path, password=settings.file_password.get_secret_value()):
     tmp_file = io.BytesIO()
