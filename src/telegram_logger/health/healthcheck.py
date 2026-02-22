@@ -6,7 +6,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
 from telegram_logger.health.beats import LAST_HOUSEKEEPING_AT
-from telegram_logger.settings import settings
+from telegram_logger.settings import get_settings
+
+settings = get_settings()
 
 STARTED_AT = datetime.now(timezone.utc)
 LAST_ERROR_AT: Optional[datetime] = None

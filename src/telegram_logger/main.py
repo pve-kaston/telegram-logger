@@ -10,10 +10,11 @@ from telegram_logger.handlers.new_message import new_message_handler
 from telegram_logger.handlers.restricted_saver import save_restricted_msg
 from telegram_logger.health.beats import beat_housekeeping
 from telegram_logger.health.healthcheck import setup_healthcheck
-from telegram_logger.settings import settings
+from telegram_logger.settings import get_settings
 from telegram_logger.storage.encrypted_deleted import EncryptedDeletedStorage
 from telegram_logger.storage.plaintext import PlaintextBufferStorage
 
+settings = get_settings()
 
 client: TelegramClient
 

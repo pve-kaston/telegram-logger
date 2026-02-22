@@ -2,7 +2,9 @@ import asyncio
 from telethon import TelegramClient
 
 from telegram_logger.main import run
-from telegram_logger.settings import settings
+from telegram_logger.settings import get_settings
+
+settings = get_settings()
 
 def ensure_directories() -> None:
     dirs = {

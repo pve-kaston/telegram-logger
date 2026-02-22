@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, registry
 
-from telegram_logger.settings import Settings
+from telegram_logger.settings import get_settings
+
+settings = get_settings()
 
 Int16: TypeAlias = Annotated[int, 16]
 Int64: TypeAlias = Annotated[int, 64]

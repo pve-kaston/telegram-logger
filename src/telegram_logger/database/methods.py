@@ -8,9 +8,10 @@ from telethon.events import MessageDeleted, MessageEdited
 from telethon.tl.types import UpdateReadMessagesContents
 
 from telegram_logger.database import DbMessage, async_session
-from telegram_logger.settings import settings
+from telegram_logger.settings import get_settings
 from telegram_logger.tg_types import ChatType
 
+settings = get_settings()
 
 async def message_exists(msg_id: int, chat_id: int) -> bool:
     async with async_session() as session:
