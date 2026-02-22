@@ -50,5 +50,5 @@ async def register_models() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
-engine: AsyncEngine = create_async_engine(url=Settings().build_sqlite_url())
+engine: AsyncEngine = create_async_engine(url=settings().build_sqlite_url())
 async_session = async_sessionmaker(bind=engine, expire_on_commit=False)
