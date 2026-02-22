@@ -1,14 +1,14 @@
 from pathlib import Path
 from typing import Final
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    data_root: Path = Path("/data")
     api_id: int
     api_hash: SecretStr
-    session_name: str = "data/user.session"
 
     log_chat_id: int
     ignored_ids: set[int] = Field(default_factory=set)
@@ -16,8 +16,6 @@ class Settings(BaseSettings):
 
     buffer_all_media: bool = False
     max_buffer_file_size: int = 200 * 1024 * 1024
-    media_dir: str = "media"
-    media_deleted_dir: str = "media_deleted"
     media_buffer_ttl_hours: int = 24
 
     encrypt_deleted_media: bool = True
@@ -29,7 +27,6 @@ class Settings(BaseSettings):
     delete_sent_gifs_from_saved: bool = True
     delete_sent_stickers_from_saved: bool = True
 
-    sqlite_db_file: Path = Path("data/messages.db")
     persist_time_in_days_bot: int = 1
     persist_time_in_days_user: int = 1
     persist_time_in_days_channel: int = 1
@@ -43,6 +40,27 @@ class Settings(BaseSettings):
     debug_mode: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    @computed_field
+    @property
+    def session_file(self) -> Path:
+        return self.data_root / "db/user.session"
+
+    @computed_field
+    @property
+    def media_dir(self) -> Path:
+        return self.data_root / "media"
+
+    @computed_field
+    @property
+    def media_deleted_dir(self) -> Path:
+        return self.data_root / "media_deleted"
+
+    @computed_field
+    @property
+    def sqlite_db_file(self) -> Path:
+        return self.data_root / "db/messages.db"
+
 
     def build_sqlite_url(self) -> str:
         return f"sqlite+aiosqlite:///{self.sqlite_db_file}"
