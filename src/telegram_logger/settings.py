@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Final
+from functools import lru_cache
 
 from pydantic import Field, SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -65,5 +65,6 @@ class Settings(BaseSettings):
     def build_sqlite_url(self) -> str:
         return f"sqlite+aiosqlite:///{self.sqlite_db_file}"
 
-
-settings: Final[Settings] = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

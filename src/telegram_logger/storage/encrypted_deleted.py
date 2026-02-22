@@ -1,5 +1,4 @@
 import base64
-import hashlib
 import os
 import tempfile
 from contextlib import contextmanager
@@ -29,7 +28,6 @@ class EncryptedDeletedStorage:
         os.makedirs(self.deleted_dir, exist_ok=True)
         base = os.path.basename(src_path)
         enc_path = os.path.join(self.deleted_dir, base + ".enc")
-        sha_path = enc_path + ".sha256"
 
         if os.path.exists(enc_path):
             return enc_path

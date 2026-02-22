@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, registry
 
-from telegram_logger.settings import Settings
+from telegram_logger.settings import get_settings
+
+settings = get_settings()
 
 Int16: TypeAlias = Annotated[int, 16]
 Int64: TypeAlias = Annotated[int, 64]
@@ -48,5 +50,5 @@ async def register_models() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
-engine: AsyncEngine = create_async_engine(url=Settings().build_sqlite_url())
+engine: AsyncEngine = create_async_engine(url=settings().build_sqlite_url())
 async_session = async_sessionmaker(bind=engine, expire_on_commit=False)
