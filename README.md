@@ -1,85 +1,99 @@
 # Telegram logger
 
-`telegram-logger` — сервис на **Telethon**, который автоматически сохраняет входящие/исходящие сообщения в SQLite, буферизует медиа и при удалении/редактировании отправляет восстановленный контент в отдельный лог-чат. Проект рассчитан на запуск как **systemd service** или как **Docker-контейнер**.
+`telegram-logger` is a service built on **Telethon** that automatically stores incoming/outgoing messages in SQLite, buffers media, and upon deletion/editing sends restored content to a separate log chat. The project is designed to run as a **systemd service** or as a **Docker container**.
 
-> Огромное спасибо [kawaiiDango](https://github.com/kawaiiDango) и его проекту на основе которого был построен данный сервис: https://github.com/kawaiiDango/telegram-delete-logger
+> Huge thanks to [kawaiiDango](https://github.com/kawaiiDango) and their project on which this service is based: [https://github.com/kawaiiDango/telegram-delete-logger](https://github.com/kawaiiDango/telegram-delete-logger)
 
-## Что делает сервис
+## What the service does
 
-Основные сценарии:
+Main scenarios:
 
-1. **Логирует сообщения** (текст + сериализованные метаданные медиа) в SQLite.
-2. **Буферизует медиафайлы** в `media/` для восстановления:
-	   - удалённых сообщений,
-	   - сообщений с ограничениями (`noforwards`, self-destruct).
-3. **Отслеживает удаление сообщений**:
-	   - для текста отправляет восстановленный текст в лог-чат;
-	   - для медиа пытается взять файл из буфера, при необходимости повторно получает сообщение и отправляет файл в лог-чат.
-4. **Опционально сохраняет историю редактирования текста** (формат `before/after`).
-5. **Опционально шифрует удалённые медиа** в `media_deleted/` (AES-256-GCM).
-6. **Периодически чистит данные**:
-	   - старые записи в БД по TTL (раздельно для типов чатов),
-	   - устаревшие файлы буфера по TTL.
-7. **Ручное сохранение restricted сообщений по ссылке**:
-	   - отправьте одну или несколько ссылок (разделённых пробелом) в лог-чат;
-	   - поддерживаются ссылки форматов:  
-	     `https://t.me/...`, `https://t.me/c/...`, `tg://openmessage...`, `tg://privatepost...`.
-8. **Поднимает HTTP health endpoint** (по умолчанию `/health`) для мониторинга состояния.
+1. **Logs messages** (text + serialized media metadata) to SQLite.
+2. **Buffers media files** in `media/` for recovery of:
 
-## Рекомендации по настройке и использованию
+   * deleted messages,
+   * restricted messages (`noforwards`, self-destruct).
+3. **Tracks message deletions**:
 
-### Канал и чат комментариев — разные сущности
+   * for text — sends restored text to the log chat;
+   * for media — attempts to retrieve the file from the buffer, optionally re-fetches the message if needed, and sends the file to the log chat.
+4. **Optionally saves text edit history** (format `before/after`).
+5. **Optionally encrypts deleted media** in `media_deleted/` (AES-256-GCM).
+6. **Periodically cleans up data**:
 
-В Telegram **канал** и его **чат комментариев (discussion group)** — это **два разных чата с разными ID**. Частая ситуация: канал полезный, а комментарии (и боты в них) генерируют много шума/спама.
+   * old DB records by TTL (separately per chat type),
+   * outdated buffer files by TTL.
+7. **Manual saving of restricted messages via link**:
 
-Если вы хотите отключить логирование спама, добавляйте в `IGNORED_IDS` **ID именно чата комментариев**, а не ID самого канала.
+   * send one or multiple links (space-separated) to the log chat;
+   * supported link formats:
+     `https://t.me/...`, `https://t.me/c/...`, `tg://openmessage...`, `tg://privatepost...`.
+8. **Exposes an HTTP health endpoint** (default `/health`) for monitoring.
 
-### Как узнать ID чата/канала
+---
 
-Самый простой способ — посмотреть ссылку на сообщение (если Telegram показывает формат `t.me/c/...`).
+## Configuration and usage recommendations
 
-Пример:
+### Channel and discussion chat are different entities
 
-`https://t.me/c/1234567890/1234`
+In Telegram, a **channel** and its **discussion group (comments chat)** are **two separate chats with different IDs**. A common case: the channel itself is useful, but comments (and bots inside them) generate a lot of noise/spam.
 
-- `1234567890` — **ID чата/канала** (внутренний идентификатор),
-- `1234` — номер сообщения.
+If you want to disable logging of spam, add the **ID of the discussion chat**, not the channel ID, to `IGNORED_IDS`.
 
-Если вместо числа используется `username`, например `https://t.me/some_channel/1234`, то это **username**, а не ID. Для преобразования `username → numeric ID` можно использовать бота `@username_to_id_bot`.
+### How to find a chat/channel ID
 
-### Зачем использовать `IGNORED_IDS`
+The easiest way is to look at a message link (if Telegram shows the `t.me/c/...` format).
 
-Если какие-то каналы/чаты вам не нужны или создают шум, добавьте их ID в `IGNORED_IDS`. Тогда сообщения из них **не будут логироваться**, а база и буфер медиа не будут засоряться.
+Example:
 
-## Получение `API_ID` и `API_HASH` (Telegram)
+```
+https://t.me/c/1234567890/1234
+```
 
-Сервис использует **Telegram API (MTProto)** через Telethon — для этого нужны `API_ID` и `API_HASH`.
+* `1234567890` — **chat/channel ID** (internal identifier),
+* `1234` — message number.
 
-1. Откройте: `https://my.telegram.org`
-2. Войдите по номеру телефона (Telegram отправит код).
-3. Перейдите в **API development tools**.
-4. Создайте приложение (*Create new application*):
-	   - **App title**: любое (например `telegram-logger`)
-	   - **Short name**: любое (например `tglogger`)
-	   - Остальные поля можно заполнить произвольно.
-5. После создания появятся значения:
-	   - **App api_id** → `API_ID`
-	   - **App api_hash** → `API_HASH`
+If a `username` is used instead, e.g. `https://t.me/some_channel/1234`, that is a **username**, not an ID. To convert `username → numeric ID`, you can use the bot `@username_to_id_bot`.
 
-Добавьте их в `.env`:
+### Why use `IGNORED_IDS`
+
+If certain channels/chats are not needed or create noise, add their IDs to `IGNORED_IDS`. Messages from them will **not be logged**, and your database and media buffer will not be cluttered.
+
+---
+
+## Obtaining `API_ID` and `API_HASH` (Telegram)
+
+The service uses the **Telegram API (MTProto)** via Telethon — for this you need `API_ID` and `API_HASH`.
+
+1. Open: `https://my.telegram.org`
+2. Log in using your phone number (Telegram will send a code).
+3. Go to **API development tools**.
+4. Create an application (*Create new application*):
+
+   * **App title**: any (e.g. `telegram-logger`)
+   * **Short name**: any (e.g. `tglogger`)
+   * Other fields can be filled arbitrarily.
+5. After creation you will see:
+
+   * **App api_id** → `API_ID`
+   * **App api_hash** → `API_HASH`
+
+Add them to `.env`:
 
 ```env
 API_ID=123456
 API_HASH="your_api_hash_here"
-````
+```
 
-## Получение `user.session` (Telethon session)
+---
 
-`user.session` — файл авторизации Telethon. Он создаётся **при первом успешном входе** (код из Telegram / пароль 2FA, если включён). После этого сервис может работать без повторной авторизации, пока сессия валидна.
+## Obtaining `user.session` (Telethon session)
 
-### Вариант A — автоматически через Docker (рекомендуется)
+`user.session` is the Telethon authorization file. It is created **on the first successful login** (Telegram code / 2FA password if enabled). After that, the service can run without re-authentication as long as the session remains valid.
 
-При первом запуске контейнер запросит код подтверждения и создаст session-файл в примонтированном `/data`.
+### Option A — automatically via Docker (recommended)
+
+On first container run, it will prompt for the confirmation code and create the session file in the mounted `/data`.
 
 ```bash
 docker run --rm -it \
@@ -90,47 +104,53 @@ docker run --rm -it \
   ghcr.io/pve-kaston/telegram-logger:latest
 ```
 
-После успешного логина файл появится на хосте:
+After successful login, the file will appear on the host:
 
-- `./data/db/user.session`
+* `./data/db/user.session`
 
-Важно:
-- запускайте **с `-it`**, чтобы можно было ввести код/пароль 2FA;
-- обязательно монтируйте `-v $(pwd)/data:/data`, иначе session останется внутри контейнера и исчезнет после удаления контейнера.
+Important:
 
-### Вариант B — вручную (локально, только генерация session)
+* run with **`-it`** so you can enter the code/2FA password;
+* обязательно mount `-v $(pwd)/data:/data`, otherwise the session will remain inside the container and disappear after it is removed.
 
-Вы можете создать `user.session` заранее скриптом из `scripts/`:
+### Option B — manually (local, session generation only)
+
+You can generate `user.session` in advance using the script from `scripts/`:
 
 ```bash
 cd scripts
 pip install telethon
 export API_ID=123456
 export API_HASH="your_api_hash_here"
-export SESSION_FILE="../src/telegram_logger/data/db/user.session"   # опционально
+export SESSION_FILE="../src/telegram_logger/data/db/user.session"   # optional
 python generate_session.py
 ```
 
-Если `SESSION_FILE` не задан, session создастся в текущей директории.
+If `SESSION_FILE` is not set, the session will be created in the current directory.
 
-### Если `user.session` уже есть
+### If `user.session` already exists
 
-Если у вас уже имеется готовый файл `user.session`, просто поместите его в:
-- Docker: `/data/db/user.session` (на хосте обычно `./data/db/user.session` при `-v $(pwd)/data:/data`)
+If you already have a ready `user.session` file, simply place it in:
 
-После этого при следующих запусках повторная авторизация (код и 2FA) **не потребуется**.
+* Docker: `/data/db/user.session` (on host usually `./data/db/user.session` when using `-v $(pwd)/data:/data`)
 
-## Конфигурация (ENV)
+After that, on subsequent runs, re-authentication (code and 2FA) will **not be required**.
 
-Все параметры задаются через `.env` (или реальные env vars).
-### Обязательные
+---
+
+## Configuration (ENV)
+
+All parameters are set via `.env` (or actual environment variables).
+
+### Required
 
 ```env
 API_ID=123456
 API_HASH="your_telegram_api_hash_here"
 LOG_CHAT_ID=-1001234567890
 ```
-### Рекомендуемые
+
+### Recommended
 
 ```env
 IGNORED_IDS=[-1002222222222222222222, -10033333333333333333333]
@@ -168,7 +188,8 @@ HEALTH_HOUSEKEEPING_STALE_SECS=600
 DEBUG_MODE=false
 ```
 
-### Сгенерировать ключ для `DELETED_MEDIA_KEY_B64`
+### Generate a key for `DELETED_MEDIA_KEY_B64`
+
 ```bash
 python - <<'PY'
 import base64, os
@@ -176,9 +197,11 @@ print(base64.b64encode(os.urandom(32)).decode())
 PY
 ```
 
-## Локальный запуск
+---
 
-### 1) Установка зависимостей
+## Local run
+
+### 1) Install dependencies
 
 ```bash
 cd src
@@ -186,20 +209,24 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
-### 2) Подготовка окружения
 
-Создайте `.env` рядом с `src/telegram_logger` entrypoint (или экспортируйте env vars).
-### 3) Запуск
+### 2) Prepare environment
+
+Create `.env` next to the `src/telegram_logger` entrypoint (or export env vars).
+
+### 3) Run
 
 ```bash
 python -m telegram_logger
 ```
 
-При первом старте Telethon создаст session-файл в `${DATA_ROOT}/db/user.session`.
+On first start, Telethon will create the session file in `${DATA_ROOT}/db/user.session`.
+
+---
 
 ## Docker
 
-### Запуск через `docker run`
+### Run via `docker run`
 
 ```bash
 docker run -it \
@@ -210,26 +237,29 @@ docker run -it \
   ghcr.io/pve-kaston/telegram-logger:latest
 ```
 
-### Запуск через Docker Compose
+### Run via Docker Compose
 
-1. Создайте файл `.env` с обязательными переменными (`API_ID`, `API_HASH`, `LOG_CHAT_ID`).
-2. Так же создайте директорию `data/db/` и положите туда файл `user.session`
-3. Запустите:
+1. Create a `.env` file with required variables (`API_ID`, `API_HASH`, `LOG_CHAT_ID`).
+2. Also create the directory `data/db/` and place `user.session` there.
+3. Run:
 
 ```bash
 docker compose up
 ```
 
+---
+
 ## systemd
 
-Шаблон unit-файла: `telegram-logger.service`.
-Типовой flow:
+Unit file template: `telegram-logger.service`.
 
-1. Скопировать проект в `/opt/telegram_logger`.
-2. Положить. в `/opt/telegram_logger/src/data/db/` файл user.session.
-3. Подготовить `/etc/telegram_logger/.env`.
-4. Создать пользователя `telegram_logger` и изменить права на созданные файлы.
-5. Установить unit:
+Typical flow:
+
+1. Copy the project to `/opt/telegram_logger`.
+2. Place `user.session` in `/opt/telegram_logger/src/data/db/`.
+3. Prepare `/etc/telegram_logger/.env`.
+4. Create user `telegram_logger` and adjust permissions.
+5. Install the unit:
 
 ```bash
 sudo cp telegram-logger.service /etc/systemd/system/telegram-logger.service
@@ -237,13 +267,14 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now telegram-logger
 ```
 
+---
 
-## Расшифровка удалённых медиа (если включено шифрование)
+## Decrypting deleted media (if encryption is enabled)
 
-Если вы включили `ENCRYPT_DELETED_MEDIA=true`, удалённые медиа сохраняются в зашифрованном виде.  
-Для расшифровки используйте скрипт из `scripts/`.
+If `ENCRYPT_DELETED_MEDIA=true`, deleted media is stored encrypted.
+Use the script from `scripts/` to decrypt.
 
-Пример:
+Example:
 
 ```bash
 export TELEGRAM_DELETED_MEDIA_KEY_B64="YOUR_BASE64_KEY_HERE"
@@ -253,4 +284,4 @@ python3 scripts/decrypt_deleted_media.py \
   --out ~/telegram-logger-decrypted
 ```
 
-> `TELEGRAM_DELETED_MEDIA_KEY_B64` должен совпадать с ключом `DELETED_MEDIA_KEY_B64`, который использовался при шифровании.
+> `TELEGRAM_DELETED_MEDIA_KEY_B64` must match the `DELETED_MEDIA_KEY_B64` used during encryption.
