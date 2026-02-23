@@ -1,7 +1,5 @@
 # Telegram logger
 
-`telegram-logger` is a service built on **Telethon** that automatically stores incoming/outgoing messages in SQLite, buffers media, and upon deletion/editing sends restored content to a separate log chat. The project is designed to run as a **systemd service** or as a **Docker container**.
-
 > Huge thanks to [kawaiiDango](https://github.com/kawaiiDango) and their project on which this service is based: [https://github.com/kawaiiDango/telegram-delete-logger](https://github.com/kawaiiDango/telegram-delete-logger)
 
 ## What the service does
