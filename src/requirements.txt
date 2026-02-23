@@ -1,9 +1,9 @@
-Telethon>=1.40.0,<2.0
-cryptg>=0.5.0,<1.0
+Telethon>=1.42.0
+cryptg>=0.5.2
 cryptography>=46.0.5
-pyAesCrypt>=6.1.1,<7.0
-SQLAlchemy>=2.0.25,<2.1
-greenlet>=3.0
-aiosqlite>=0.22.1,<1.0
-pydantic>=2.12.2,<3.0
-pydantic_settings>=2.12.0,<3.0
+pyAesCrypt>=6.1.1
+SQLAlchemy>=2.0.46
+greenlet>=3.3.2
+aiosqlite>=0.22.1
+pydantic>=2.12.5
+pydantic_settings>=2.13.1

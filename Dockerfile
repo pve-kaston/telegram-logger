@@ -27,4 +27,6 @@ USER app
 ENV PYTHONUNBUFFERED=1
 ENV DATA_ROOT=/data
 
+EXPOSE 8080
+
 CMD ["python3", "-m", "telegram_logger"]
