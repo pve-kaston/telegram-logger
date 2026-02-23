@@ -99,7 +99,9 @@ async def save_restricted_msg(link: str, client, buffer_storage, target_chat_id:
             logger.exception("Failed to buffer media for link: %s", link)
 
         if not local_path:
-            local_path = buffer_storage.buffer_find(msg.id, getattr(msg, "chat_id", None) or chat_id or 0)
+            local_path = buffer_storage.buffer_find(
+                msg.id, getattr(msg, "chat_id", None) or chat_id or 0
+            )
 
         try:
             await client.send_file(target_chat_id, msg.media, caption=msg.text or "")

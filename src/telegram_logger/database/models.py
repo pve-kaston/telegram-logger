@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, TypeAlias
 
-from sqlalchemy import BigInteger, Index, Integer, func, PrimaryKeyConstraint
+from sqlalchemy import BigInteger, Index, Integer, PrimaryKeyConstraint, func
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
     AsyncEngine,

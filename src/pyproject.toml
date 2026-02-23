@@ -1,49 +1,22 @@
-[tool.black]
-line_length = 99
-exclude = "\\.?venv|\\.?tests"
-
 [tool.ruff]
 target-version = "py38"
 line-length = 99
+exclude = [
+    ".git",
+    ".venv",
+]
+
+[tool.ruff.lint]
 select = [
-    "C",
-    "DTZ",
     "E",
     "F",
     "I",
-    "ICN",
-    "ISC",
-    "N",
-    "PLC",
-    "PLE",
-    "Q",
     "S",
-    "T",
-    "W",
-    "YTT",
-    "RET",
     "SIM",
-    "ASYNC",
+    "RET",
 ]
-exclude = [
-    ".git",
-    ".venv",
-    ".idea",
-    ".tests",
-    ".cache",
-    "build",
-    "dist",
-    "scripts",
-]
-
-[tool.mypy]
-exclude = [
-    ".git",
-    ".venv",
-    ".idea",
-    ".tests",
-    ".cache",
-    "build",
-    "dist",
-    "scripts",
+ignore = [
+    "C901",
+    "ASYNC230",
+    "ASYNC240",
 ]

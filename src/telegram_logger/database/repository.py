@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from telegram_logger.database.models import register_models
 from telegram_logger.database.methods import (
     delete_expired_messages_from_db,
     get_message_ids_by_event,
     message_exists,
     save_message,
 )
+from telegram_logger.database.models import register_models
 
 
 class MessageRepository:

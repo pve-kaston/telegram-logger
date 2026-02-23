@@ -1,8 +1,8 @@
 from __future__ import annotations
-from contextlib import suppress
 
 import os
 import re
+from contextlib import suppress
 
 from telethon import events
 from telethon.errors import FileMigrateError, FileReferenceExpiredError
@@ -15,14 +15,17 @@ _MD_SAFE_RE = re.compile(r"^[A-Za-z0-9 .-]+$")
 def _is_md_safe(text: str) -> bool:
     return bool(text) and bool(_MD_SAFE_RE.fullmatch(text))
 
+
 def _escape_md_label(text: str) -> str:
     value = (text or "").strip()
     return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
 
 def _remove_file_quietly(path: str) -> None:
     if path:
         with suppress(FileNotFoundError):
             os.remove(path)
+
 
 def _ids_from_event(event, limit: int) -> list[int]:
     if isinstance(event, events.MessageDeleted.Event):
@@ -44,7 +47,11 @@ async def _friendly_filename(client, chat_id: int, fallback_name: str) -> str:
         chat_name = (
             getattr(entity, "username", None)
             or getattr(entity, "title", None)
-            or "_".join(filter(None, [getattr(entity, "first_name", None), getattr(entity, "last_name", None)]))
+            or "_".join(
+                filter(
+                    None, [getattr(entity, "first_name", None), getattr(entity, "last_name", None)]
+                )
+            )
             or str(chat_id)
         )
     except Exception:
@@ -70,7 +77,7 @@ async def _create_mention(client, entity_id: int, chat_msg_id: int | None = None
             username = (getattr(entity, "username", None) or "").strip()
             if username:
                 return f"[{title}](https://t.me/{username})"
-                
+
             chat_id = str(entity_id).replace("-100", "")
             return f"[{title}](https://t.me/c/{chat_id}/{msg_id})"
         first = (getattr(entity, "first_name", None) or "").strip()
@@ -87,7 +94,8 @@ async def _create_mention(client, entity_id: int, chat_msg_id: int | None = None
         return str(getattr(entity, "id", entity_id))
     except Exception:
         return str(entity_id)
-    
+
+
 async def _safe_send(client, chat_id: int, text: str, limit: int = 4096):
     if not text:
         return
@@ -95,11 +103,13 @@ async def _safe_send(client, chat_id: int, text: str, limit: int = 4096):
         text = text[: limit - 3] + "..."
     await client.send_message(chat_id, text, parse_mode="md", link_preview=False)
 
+
 async def _refetch_message(client, chat_id: int, msg_id: int):
     try:
         return await client.get_messages(chat_id, ids=msg_id)
     except (FileReferenceExpiredError, FileMigrateError):
         return await client.get_messages(chat_id, ids=msg_id)
+
 
 async def _send_deleted_file(
     client,
@@ -119,10 +129,12 @@ async def _send_deleted_file(
         attributes=[types.DocumentAttributeFilename(file_name=filename)],
         force_document=True,
         link_preview=False,
-        )
+    )
 
 
-async def edited_deleted_handler(event, client, db, buffer_storage, deleted_storage, settings, my_id):
+async def edited_deleted_handler(
+    event, client, db, buffer_storage, deleted_storage, settings, my_id
+):
     if isinstance(event, events.MessageEdited.Event):
         if not settings.save_edited_messages:
             return
@@ -171,10 +183,7 @@ async def edited_deleted_handler(event, client, db, buffer_storage, deleted_stor
             if not src:
                 continue
 
-            header = (
-                f"**Deleted message from:** {mention_sender}\n"
-                f"in {mention_chat}\n"
-            )
+            header = f"**Deleted message from:** {mention_sender}\nin {mention_chat}\n"
             body = (row.msg_text or "").strip()
             caption = header + (f"**Message:**\n{body}" if body else "")
 

@@ -1,6 +1,6 @@
-from pathlib import Path
-from functools import lru_cache
 import os
+from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -62,9 +62,9 @@ class Settings(BaseSettings):
     def sqlite_db_file(self) -> Path:
         return self.data_root / "db/messages.db"
 
-
     def build_sqlite_url(self) -> str:
         return f"sqlite+aiosqlite:///{self.sqlite_db_file}"
+
 
 @lru_cache
 def get_settings() -> Settings:

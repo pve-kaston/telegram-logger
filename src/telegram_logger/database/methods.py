@@ -13,6 +13,7 @@ from telegram_logger.tg_types import ChatType
 
 settings = get_settings()
 
+
 async def message_exists(msg_id: int, chat_id: int) -> bool:
     async with async_session() as session:
         query = select(DbMessage.id).where(

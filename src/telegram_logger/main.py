@@ -7,7 +7,10 @@ from telethon import TelegramClient, events
 from telegram_logger.database import MessageRepository
 from telegram_logger.handlers.edited_deleted import edited_deleted_handler
 from telegram_logger.handlers.new_message import new_message_handler
-from telegram_logger.handlers.restricted_saver import maybe_handle_restricted_link, save_restricted_msg
+from telegram_logger.handlers.restricted_saver import (
+    maybe_handle_restricted_link,
+    save_restricted_msg,
+)
 from telegram_logger.health.beats import beat_housekeeping
 from telegram_logger.health.healthcheck import setup_healthcheck
 from telegram_logger.settings import get_settings
@@ -23,7 +26,9 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
-async def housekeeping_loop(db: MessageRepository, buffer_storage: PlaintextBufferStorage, ttl_hours: int):
+async def housekeeping_loop(
+    db: MessageRepository, buffer_storage: PlaintextBufferStorage, ttl_hours: int
+):
     while True:
         beat_housekeeping()
         now = utcnow()
@@ -87,15 +92,21 @@ async def run(client: TelegramClient):
     )
 
     client.add_event_handler(
-        lambda e: edited_deleted_handler(e, client, db, buffer_storage, deleted_storage, settings, my_id),
+        lambda e: edited_deleted_handler(
+            e, client, db, buffer_storage, deleted_storage, settings, my_id
+        ),
         events.MessageEdited(),
     )
     client.add_event_handler(
-        lambda e: edited_deleted_handler(e, client, db, buffer_storage, deleted_storage, settings, my_id),
+        lambda e: edited_deleted_handler(
+            e, client, db, buffer_storage, deleted_storage, settings, my_id
+        ),
         events.MessageDeleted(),
     )
     client.add_event_handler(
-        lambda e: edited_deleted_handler(e, client, db, buffer_storage, deleted_storage, settings, my_id)
+        lambda e: edited_deleted_handler(
+            e, client, db, buffer_storage, deleted_storage, settings, my_id
+        )
     )
 
     if not settings.listen_outgoing_messages:
@@ -104,7 +115,9 @@ async def run(client: TelegramClient):
                 e,
                 settings,
                 my_id,
-                lambda link: save_restricted_msg(link, client, buffer_storage, settings.log_chat_id),
+                lambda link: save_restricted_msg(
+                    link, client, buffer_storage, settings.log_chat_id
+                ),
             ),
             events.NewMessage(outgoing=True),
         )

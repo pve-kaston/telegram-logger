@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -5,6 +6,7 @@ from typing import Optional
 
 from telethon.tl import types
 
+logger = logging.getLogger(__name__)
 
 def canonical_prefix(msg_id: int, chat_id: int) -> str:
     return f"{chat_id}_{msg_id}_"
@@ -38,9 +40,13 @@ def _guess_filename_from_media(media) -> str:
     doc = media if isinstance(media, types.Document) else getattr(media, "document", None)
     if isinstance(doc, types.Document):
         for attr in getattr(doc, "attributes", []):
-            if isinstance(attr, types.DocumentAttributeFilename) and getattr(attr, "file_name", None):
+            if isinstance(attr, types.DocumentAttributeFilename) and getattr(
+                attr, "file_name", None
+            ):
                 return _safe_name(attr.file_name)
-            if isinstance(attr, types.DocumentAttributeVideo) and getattr(attr, "round_message", False):
+            if isinstance(attr, types.DocumentAttributeVideo) and getattr(
+                attr, "round_message", False
+            ):
                 return "video_note.mp4"
 
         mime = getattr(doc, "mime_type", None)
@@ -65,7 +71,12 @@ class PlaintextBufferStorage:
             chat_name = (
                 getattr(entity, "username", None)
                 or getattr(entity, "title", None)
-                or "_".join(filter(None, [getattr(entity, "first_name", None), getattr(entity, "last_name", None)]))
+                or "_".join(
+                    filter(
+                        None,
+                        [getattr(entity, "first_name", None), getattr(entity, "last_name", None)],
+                    )
+                )
                 or str(chat_id)
             )
         except Exception:
@@ -108,5 +119,6 @@ class PlaintextBufferStorage:
                 mtime = os.path.getmtime(path)
                 if datetime.fromtimestamp(mtime, tz=timezone.utc) < (now - ttl):
                     os.remove(path)
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to purge file %s: %s", path, e)
                 continue

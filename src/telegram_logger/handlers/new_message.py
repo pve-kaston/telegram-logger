@@ -38,7 +38,10 @@ async def _chat_type(event) -> ChatType:
 async def _noop_save_restricted(_link: str) -> None:
     return None
 
-async def new_message_handler(event, client, db, buffer_storage, settings, my_id, save_restricted_fn=None):
+
+async def new_message_handler(
+    event, client, db, buffer_storage, settings, my_id, save_restricted_fn=None
+):
     if save_restricted_fn is None:
         save_restricted_fn = _noop_save_restricted
     if await maybe_handle_restricted_link(event, settings, my_id, save_restricted_fn):
@@ -53,7 +56,9 @@ async def new_message_handler(event, client, db, buffer_storage, settings, my_id
     if event.is_private and event.chat_id == my_id:
         return
 
-    noforwards = bool(getattr(getattr(event, "chat", None), "noforwards", False) or event.message.noforwards)
+    noforwards = bool(
+        getattr(getattr(event, "chat", None), "noforwards", False) or event.message.noforwards
+    )
     self_destructing = bool(getattr(getattr(event.message, "media", None), "ttl_seconds", None))
     media = _extract_media(event.message)
 

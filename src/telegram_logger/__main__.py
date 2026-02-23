@@ -1,10 +1,12 @@
 import asyncio
+
 from telethon import TelegramClient
 
 from telegram_logger.main import run
 from telegram_logger.settings import get_settings
 
 settings = get_settings()
+
 
 def ensure_directories() -> None:
     dirs = {
@@ -16,6 +18,7 @@ def ensure_directories() -> None:
 
     for path in dirs:
         path.mkdir(parents=True, exist_ok=True)
+
 
 async def main():
     ensure_directories()

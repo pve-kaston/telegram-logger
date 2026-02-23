@@ -50,9 +50,11 @@ class EncryptedDeletedStorage:
         nonce, ct = blob[:12], blob[12:]
         data = self.aes.decrypt(nonce, ct, None)
 
-        tmp = tempfile.NamedTemporaryFile("wb", delete=True)
-        tmp.write(data)
-        tmp.flush()
+        with tempfile.NamedTemporaryFile("wb", delete=True) as tmp:
+            tmp.write(data)
+            tmp.flush()
+            return tmp.name
+        
         tmp.seek(0)
         try:
             yield tmp
