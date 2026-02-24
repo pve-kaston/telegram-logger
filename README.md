@@ -105,7 +105,7 @@ docker run --rm -it \
   -e API_ID=123456 \
   -e API_HASH="your_api_hash_here" \
   -e LOG_CHAT_ID=-1001234567890 \
-  ghcr.io/pve-kaston/telegram-logger:latest
+  ghcr.io/pve-kaston/telegram-message-logger:latest
 ```
 
 After successful login, the file will appear on the host:
@@ -240,7 +240,7 @@ docker run -it \
   -e API_ID=123456 \
   -e API_HASH="your_api_hash_here" \
   -e LOG_CHAT_ID=-1001234567890 \
-  ghcr.io/pve-kaston/telegram-logger:latest
+  ghcr.io/pve-kaston/telegram-message-logger:latest
 ```
 
 ### Run via Docker Compose

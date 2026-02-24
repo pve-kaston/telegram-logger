@@ -1,7 +1,7 @@
 services:
   telegram-logger:
     container_name: telegram-logger
-    image: ghcr.io/pve-kaston/telegram-logger:latest
+    image: ghcr.io/pve-kaston/telegram-message-logger:latest
     env_file: .env
     volumes:
       - /data:/data
