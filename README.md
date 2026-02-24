@@ -1,6 +1,12 @@
 # Telegram logger
 
+`telegram-logger` is a service built on **Telethon** that automatically stores incoming/outgoing messages in SQLite, buffers media, and upon deletion/editing sends restored content to a separate log chat. The project is designed to run as a **systemd service** or as a **Docker container**.
+
 > Huge thanks to [kawaiiDango](https://github.com/kawaiiDango) and their project on which this service is based: [https://github.com/kawaiiDango/telegram-delete-logger](https://github.com/kawaiiDango/telegram-delete-logger)
+
+## ⚠️ Disclaimer
+
+**Use at your own risk. You are solely responsible for compliance with Telegram rules/API Terms, applicable laws, and any consequences of use (including account limits or bans).**
 
 ## What the service does
 
@@ -10,7 +16,7 @@ Main scenarios:
 2. **Buffers media files** in `media/` for recovery of:
 
    * deleted messages,
-   * restricted messages (`noforwards`, self-destruct).
+   * optionally restricted messages (`noforwards`, self-destruct).
 3. **Tracks message deletions**:
 
    * for text — sends restored text to the log chat;
@@ -21,7 +27,7 @@ Main scenarios:
 
    * old DB records by TTL (separately per chat type),
    * outdated buffer files by TTL.
-7. **Manual saving of restricted messages via link**:
+7. **Optionally manual saving of restricted messages via link**:
 
    * send one or multiple links (space-separated) to the log chat;
    * supported link formats:
@@ -161,6 +167,8 @@ LISTEN_OUTGOING_MESSAGES=true
 # DATA_ROOT=/custom/path
 
 BUFFER_ALL_MEDIA=true
+BUFFER_NOFORWARDS_CONTENT=false
+PROCESS_SELF_DESTRUCT_MEDIA=false
 MAX_BUFFER_FILE_SIZE=104857600 # 100 MB
 MEDIA_BUFFER_TTL_HOURS=24
 

@@ -161,6 +161,9 @@ async def edited_deleted_handler(
     if not isinstance(event, (events.MessageDeleted.Event, types.UpdateReadMessagesContents)):
         return
 
+    if isinstance(event, types.UpdateReadMessagesContents) and not settings.process_self_destruct_media:
+        return
+    
     ids = _ids_from_event(event, settings.max_deleted_messages_per_event)
     rows = await db.get_messages_by_event(getattr(event, "chat_id", None), ids)
 

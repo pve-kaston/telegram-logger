@@ -59,10 +59,15 @@ async def new_message_handler(
     noforwards = bool(
         getattr(getattr(event, "chat", None), "noforwards", False) or event.message.noforwards
     )
-    self_destructing = bool(getattr(getattr(event.message, "media", None), "ttl_seconds", None))
+    self_destructing_detected = bool(
+        getattr(getattr(event.message, "media", None), "ttl_seconds", None)
+    )
+    self_destructing = settings.process_self_destruct_media and self_destructing_detected
     media = _extract_media(event.message)
 
-    if media and (self_destructing or noforwards or settings.buffer_all_media):
+    should_buffer_noforwards = settings.buffer_noforwards_content and noforwards
+    should_buffer_self_destruct = settings.process_self_destruct_media and self_destructing_detected
+    if media and (should_buffer_self_destruct or should_buffer_noforwards or settings.buffer_all_media):
         await buffer_storage.buffer_save(event.message)
 
     if await db.message_exists(event.message.id, chat_id):

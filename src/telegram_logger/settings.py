@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     listen_outgoing_messages: bool = True
 
     buffer_all_media: bool = True
+    buffer_noforwards_content: bool = False
+    process_self_destruct_media: bool = False
     max_buffer_file_size: int = 100 * 1024 * 1024
     media_buffer_ttl_hours: int = 24
 
