@@ -11,6 +11,7 @@ from telegram_logger.database import DbMessage, async_session
 from telegram_logger.settings import get_settings
 from telegram_logger.tg_types import ChatType
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -20,7 +21,12 @@ async def message_exists(msg_id: int, chat_id: int) -> bool:
             DbMessage.id == msg_id,
             DbMessage.chat_id == chat_id,
         )
-        return bool((await session.execute(query)).scalar())
+        exists = bool((await session.execute(query)).scalar())
+        if exists:
+            logger.debug(
+                "Message already exists in DB msg_id=%s chat_id=%s", msg_id, chat_id
+            )
+        return exists
 
 
 async def save_message(
@@ -55,10 +61,10 @@ async def save_message(
         except IntegrityError:
             # duplicate (id, chat_id) races can happen under concurrent update delivery
             await session.rollback()
-            logging.debug("Duplicate message ignored %s/%s", chat_id, msg_id)
+            logger.debug("Duplicate message ignored %s/%s", chat_id, msg_id)
         except OperationalError as exc:
             await session.rollback()
-            logging.error("Failed to save message %s/%s: %s", chat_id, msg_id, exc)
+            logger.error("Failed to save message %s/%s: %s", chat_id, msg_id, exc)
 
 
 async def get_message_ids_by_event(
@@ -82,13 +88,21 @@ async def get_message_ids_by_event(
                 DbMessage.self_destructing,
                 DbMessage.created_at,
             )
-            .where(*where_clause)  # apply the where clause
-            .order_by(DbMessage.edited_at.desc())  # order by edited time
-            .distinct(DbMessage.chat_id, DbMessage.id)  # group by chat id and id
-            .order_by(DbMessage.created_at.asc())  # order by created time
+            .where(*where_clause)
+            .order_by(DbMessage.edited_at.desc())
+            .distinct(DbMessage.chat_id, DbMessage.id)
+            .order_by(DbMessage.created_at.asc())
         )
 
-        return (await session.execute(query)).all()
+        rows = (await session.execute(query)).all()
+        logger.debug(
+            "Fetched messages for event=%s chat_id=%s ids_count=%s rows=%s",
+            type(event).__name__,
+            getattr(event, "chat_id", None),
+            len(ids),
+            len(rows),
+        )
+        return rows
 
 
 async def delete_expired_messages_from_db(current_time: datetime) -> None:
@@ -101,16 +115,24 @@ async def delete_expired_messages_from_db(current_time: datetime) -> None:
 
     where_clause = or_(
         and_(DbMessage.type == ChatType.USER.value, DbMessage.created_at < time_user),
-        and_(DbMessage.type == ChatType.CHANNEL.value, DbMessage.created_at < time_channel),
+        and_(
+            DbMessage.type == ChatType.CHANNEL.value,
+            DbMessage.created_at < time_channel,
+        ),
         and_(DbMessage.type == ChatType.GROUP.value, DbMessage.created_at < time_group),
         and_(DbMessage.type == ChatType.BOT.value, DbMessage.created_at < time_bot),
-        and_(DbMessage.type == ChatType.UNKNOWN.value, DbMessage.created_at < time_unknown),
+        and_(
+            DbMessage.type == ChatType.UNKNOWN.value,
+            DbMessage.created_at < time_unknown,
+        ),
     )
 
     async with async_session() as session:
         result = await session.execute(delete(DbMessage).where(where_clause))
         await session.commit()
 
-        rowcount = result.rowcount
+        rowcount = result.rowcount or 0
         if rowcount > 0:
-            logging.info(f"deleted {rowcount} expired messages from db")
+            logger.info("Deleted expired messages from DB count=%s", rowcount)
+        else:
+            logger.debug("No expired messages to delete from DB")

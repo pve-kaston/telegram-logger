@@ -24,11 +24,15 @@ class _ErrorFlagHandler(logging.Handler):
 
 
 def _is_healthy(now: datetime) -> bool:
-    if LAST_ERROR_AT and (now - LAST_ERROR_AT).total_seconds() < settings.health_error_window_secs:
+    if (
+        LAST_ERROR_AT
+        and (now - LAST_ERROR_AT).total_seconds() < settings.health_error_window_secs
+    ):
         return False
     return not (
         LAST_HOUSEKEEPING_AT
-        and (now - LAST_HOUSEKEEPING_AT).total_seconds() > settings.health_housekeeping_stale_secs
+        and (now - LAST_HOUSEKEEPING_AT).total_seconds()
+        > settings.health_housekeeping_stale_secs
     )
 
 
@@ -37,7 +41,9 @@ def _payload() -> dict:
     return {
         "status": "ok" if _is_healthy(now) else "error",
         "started_at": STARTED_AT.isoformat(),
-        "last_housekeeping_at": LAST_HOUSEKEEPING_AT.isoformat() if LAST_HOUSEKEEPING_AT else None,
+        "last_housekeeping_at": (
+            LAST_HOUSEKEEPING_AT.isoformat() if LAST_HOUSEKEEPING_AT else None
+        ),
         "last_error_at": LAST_ERROR_AT.isoformat() if LAST_ERROR_AT else None,
         "last_error_msg": LAST_ERROR_MSG,
     }
@@ -69,9 +75,13 @@ class _HealthHandler(BaseHTTPRequestHandler):
 
 def setup_healthcheck() -> None:
     logging.getLogger().addHandler(_ErrorFlagHandler())
-    server = ThreadingHTTPServer(("0.0.0.0", settings.health_port), _HealthHandler) # noqa: S104
-    thread = threading.Thread(target=server.serve_forever, daemon=True, name="health-http")
+    server = ThreadingHTTPServer(
+        ("0.0.0.0", settings.health_port), _HealthHandler
+    )  # noqa: S104
+    thread = threading.Thread(
+        target=server.serve_forever, daemon=True, name="health-http"
+    )
     thread.start()
-    logging.getLogger("health").info( 
-        "Health endpoint on 0.0.0.0:%s%s", settings.health_port, settings.health_path 
+    logging.getLogger("health").info(
+        "Health endpoint on 0.0.0.0:%s%s", settings.health_port, settings.health_path
     )

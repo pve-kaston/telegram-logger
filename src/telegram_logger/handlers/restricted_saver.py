@@ -71,8 +71,10 @@ def parse_restricted_link(link: str) -> tuple[Optional[int | str], Optional[int]
     return chat_id, msg_id
 
 
-async def save_restricted_msg(link: str, client, buffer_storage, target_chat_id: int) -> None:
-    """Fetch message by link and resend to log chat, including restricted media fallback."""
+async def save_restricted_msg(
+    link: str, client, buffer_storage, target_chat_id: int
+) -> None:
+    logger.debug("Processing restricted link: %s", link)
     chat_id, msg_id = parse_restricted_link(link)
     if chat_id is None or msg_id is None:
         logger.warning("Cannot parse link: %s", link)
@@ -105,22 +107,40 @@ async def save_restricted_msg(link: str, client, buffer_storage, target_chat_id:
 
         try:
             await client.send_file(target_chat_id, msg.media, caption=msg.text or "")
+            logger.info(
+                "Saved restricted media by link=%s to chat_id=%s", link, target_chat_id
+            )
             return
         except ChatForwardsRestrictedError:
             pass
 
         if local_path and os.path.exists(local_path):
             await client.send_file(target_chat_id, local_path, caption=msg.text or "")
+            logger.info(
+                "Saved restricted media from buffer by link=%s to chat_id=%s",
+                link,
+                target_chat_id,
+            )
             return
 
-        suffix = Path(getattr(getattr(msg, "file", None), "name", "") or "").suffix or ".bin"
+        suffix = (
+            Path(getattr(getattr(msg, "file", None), "name", "") or "").suffix or ".bin"
+        )
         with tempfile.NamedTemporaryFile("wb", suffix=suffix, delete=True) as tmp:
             await client.download_media(msg.media, file=tmp.name)
             await client.send_file(target_chat_id, tmp.name, caption=msg.text or "")
+            logger.info(
+                "Saved restricted media via fallback download by link=%s to chat_id=%s",
+                link,
+                target_chat_id,
+            )
         return
 
     if msg.text:
         await client.send_message(target_chat_id, msg.text)
+        logger.info(
+            "Saved restricted text by link=%s to chat_id=%s", link, target_chat_id
+        )
 
 
 async def maybe_handle_restricted_link(event, settings, my_id, save_fn):
@@ -130,9 +150,9 @@ async def maybe_handle_restricted_link(event, settings, my_id, save_fn):
     if not event.message or not event.message.text:
         return False
 
-    sender_id = getattr(getattr(event.message, "sender_id", None), "user_id", None) or getattr(
-        event.message, "sender_id", None
-    )
+    sender_id = getattr(
+        getattr(event.message, "sender_id", None), "user_id", None
+    ) or getattr(event.message, "sender_id", None)
     is_my_message = bool(getattr(event.message, "out", False)) or sender_id == my_id
     if not is_my_message:
         return False

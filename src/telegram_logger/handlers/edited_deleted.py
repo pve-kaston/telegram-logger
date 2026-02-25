@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from contextlib import suppress
@@ -9,16 +10,14 @@ from telethon.errors import FileMigrateError, FileReferenceExpiredError
 from telethon.hints import Entity
 from telethon.tl import types
 
-_MD_SAFE_RE = re.compile(r"^[A-Za-z0-9 .-]+$")
-
-
-def _is_md_safe(text: str) -> bool:
-    return bool(text) and bool(_MD_SAFE_RE.fullmatch(text))
+logger = logging.getLogger(__name__)
 
 
 def _escape_md_label(text: str) -> str:
     value = (text or "").strip()
-    return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+    for ch in ("\\", "[", "]", "(", ")", "_", "*", "`"):
+        value = value.replace(ch, f"\\{ch}")
+    return value
 
 
 def _remove_file_quietly(path: str) -> None:
@@ -49,7 +48,11 @@ async def _friendly_filename(client, chat_id: int, fallback_name: str) -> str:
             or getattr(entity, "title", None)
             or "_".join(
                 filter(
-                    None, [getattr(entity, "first_name", None), getattr(entity, "last_name", None)]
+                    None,
+                    [
+                        getattr(entity, "first_name", None),
+                        getattr(entity, "last_name", None),
+                    ],
                 )
             )
             or str(chat_id)
@@ -64,12 +67,16 @@ async def _friendly_filename(client, chat_id: int, fallback_name: str) -> str:
     return f"{_safe_name(chat_name)}_{_safe_name(base_name)}"
 
 
-async def _create_mention(client, entity_id: int, chat_msg_id: int | None = None) -> str:
+async def _create_mention(
+    client, entity_id: int, chat_msg_id: int | None = None
+) -> str:
     msg_id = 1 if chat_msg_id is None else chat_msg_id
     if entity_id == 0:
         return "Unknown"
+
     try:
         entity: Entity = await client.get_entity(entity_id)
+
         if isinstance(entity, (types.Channel, types.Chat)):
             title = (getattr(entity, "title", None) or f"Chat {entity_id}").strip()
             title = _escape_md_label(title)
@@ -80,19 +87,28 @@ async def _create_mention(client, entity_id: int, chat_msg_id: int | None = None
 
             chat_id = str(entity_id).replace("-100", "")
             return f"[{title}](https://t.me/c/{chat_id}/{msg_id})"
+
         first = (getattr(entity, "first_name", None) or "").strip()
         last = (getattr(entity, "last_name", None) or "").strip()
+        username = (getattr(entity, "username", None) or "").strip()
+
         if first:
             full_name = f"{first} {last}".strip()
-            if not _is_md_safe(full_name):
-                full_name = f"User {entity_id}"
             full_name = _escape_md_label(full_name)
             return f"[{full_name}](tg://user?id={entity.id})"
-        username = (getattr(entity, "username", None) or "").strip()
+
         if username:
-            return f"[@{username}](https://t.me/{username})"
-        return str(getattr(entity, "id", entity_id))
+            uname = _escape_md_label(username)
+            return f"[@{uname}](https://t.me/{username})"
+
+        ent_id = getattr(entity, "id", entity_id)
+        if isinstance(ent_id, int) and ent_id > 0:
+            return f"[User {ent_id}](tg://user?id={ent_id})"
+        return str(ent_id)
+
     except Exception:
+        if isinstance(entity_id, int) and entity_id > 0:
+            return f"[User {entity_id}](tg://user?id={entity_id})"
         return str(entity_id)
 
 
@@ -104,7 +120,12 @@ async def _safe_send(client, chat_id: int, text: str, limit: int = 4096):
     await client.send_message(chat_id, text, parse_mode="md", link_preview=False)
 
 
-async def _refetch_message(client, chat_id: int, msg_id: int):
+async def _refetch_message(
+    client, chat_id: int, msg_id: int, listen_outgoing_messages: bool
+):
+    if not listen_outgoing_messages:
+        return None
+
     try:
         return await client.get_messages(chat_id, ids=msg_id)
     except (FileReferenceExpiredError, FileMigrateError):
@@ -137,6 +158,7 @@ async def edited_deleted_handler(
 ):
     if isinstance(event, events.MessageEdited.Event):
         if not settings.save_edited_messages:
+            logger.debug("Edited message processing disabled")
             return
         ids = [event.message.id]
         rows = await db.get_messages_by_event(event.chat_id, ids)
@@ -158,20 +180,46 @@ async def edited_deleted_handler(
                 )
         return
 
-    if not isinstance(event, (events.MessageDeleted.Event, types.UpdateReadMessagesContents)):
+    if not isinstance(
+        event, (events.MessageDeleted.Event, types.UpdateReadMessagesContents)
+    ):
         return
 
-    if isinstance(event, types.UpdateReadMessagesContents) and not settings.process_self_destruct_media:
+    if (
+        isinstance(event, types.UpdateReadMessagesContents)
+        and not settings.process_self_destruct_media
+    ):
+        logger.info(
+            "Skipping TTL/self-destruct event processing because PROCESS_SELF_DESTRUCT_MEDIA is disabled"
+        )
         return
-    
+
+    if (
+        isinstance(event, types.UpdateReadMessagesContents)
+        and not settings.process_self_destruct_media
+    ):
+        return
+
     ids = _ids_from_event(event, settings.max_deleted_messages_per_event)
+    logger.debug(
+        "Processing deletion-related event=%s ids_count=%s",
+        type(event).__name__,
+        len(ids),
+    )
     rows = await db.get_messages_by_event(getattr(event, "chat_id", None), ids)
 
     for row in rows:
         if row.from_id in settings.ignored_ids or row.chat_id in settings.ignored_ids:
+            logger.debug(
+                "Skipping row id=%s chat_id=%s due to ignored_ids", row.id, row.chat_id
+            )
             continue
 
-        if isinstance(event, types.UpdateReadMessagesContents) and not row.self_destructing:
+        if (
+            isinstance(event, types.UpdateReadMessagesContents)
+            and not row.self_destructing
+        ):
+            logger.debug("Skipping non-self-destruct row id=%s for TTL event", row.id)
             continue
 
         mention_sender = await _create_mention(client, row.from_id)
@@ -180,10 +228,20 @@ async def edited_deleted_handler(
         if row.media:
             src = buffer_storage.buffer_find(row.id, row.chat_id)
             if not src:
-                fresh = await _refetch_message(client, row.chat_id, row.id)
+                fresh = await _refetch_message(
+                    client,
+                    row.chat_id,
+                    row.id,
+                    settings.listen_outgoing_messages,
+                )
                 if fresh and getattr(fresh, "media", None):
                     src = await buffer_storage.buffer_save(fresh)
             if not src:
+                logger.info(
+                    "Media for deleted message id=%s chat_id=%s not found in buffer",
+                    row.id,
+                    row.chat_id,
+                )
                 continue
 
             header = f"**Deleted message from:** {mention_sender}\nin {mention_chat}\n"
@@ -193,24 +251,58 @@ async def edited_deleted_handler(
             if deleted_storage:
                 enc_path = await deleted_storage.deleted_put_from_buffer(src)
                 if not enc_path:
+                    logger.error(
+                        "Failed to encrypt deleted media id=%s chat_id=%s",
+                        row.id,
+                        row.chat_id,
+                    )
                     continue
-                _remove_file_quietly(src)
-                with deleted_storage.deleted_open_for_upload(enc_path) as f:
-                    tmp_path = getattr(f, "name", src)
+
+                try:
+                    with deleted_storage.deleted_open_for_upload(enc_path) as f:
+                        tmp_path = getattr(f, "name", src)
+                        await _send_deleted_file(
+                            client,
+                            settings.log_chat_id,
+                            tmp_path,
+                            caption,
+                            row.chat_id,
+                            display_name=os.path.basename(src),
+                        )
+                except Exception as e:
+                    logger.exception(
+                        "Failed to upload encrypted deleted media id=%s chat_id=%s enc_path=%s: %s",
+                        row.id,
+                        row.chat_id,
+                        enc_path,
+                        e,
+                    )
+                    continue
+                else:
+                    _remove_file_quietly(src)
+            else:
+                try:
                     await _send_deleted_file(
                         client,
                         settings.log_chat_id,
-                        tmp_path,
+                        src,
                         caption,
                         row.chat_id,
-                        display_name=os.path.basename(src),
                     )
-            else:
-                os.makedirs(settings.media_deleted_dir, exist_ok=True)
-                dst = os.path.join(settings.media_deleted_dir, os.path.basename(src))
-                with open(src, "rb") as in_f, open(dst, "wb") as out_f:
-                    out_f.write(in_f.read())
-                await _send_deleted_file(client, settings.log_chat_id, dst, caption, row.chat_id)
+                except Exception as e:
+                    logger.exception(
+                        "Failed to upload deleted media id=%s chat_id=%s path=%s: %s",
+                        row.id,
+                        row.chat_id,
+                        src,
+                        e,
+                    )
+                    continue
+                else:
+                    _remove_file_quietly(src)
+            logger.info(
+                "Processed deleted media message id=%s chat_id=%s", row.id, row.chat_id
+            )
         elif row.msg_text:
             await _safe_send(
                 client,
@@ -218,4 +310,7 @@ async def edited_deleted_handler(
                 f"**Deleted message from:** {mention_sender}\n"
                 f"in {mention_chat}\n"
                 f"**Message:**\n{row.msg_text}",
+            )
+            logger.info(
+                "Processed deleted text message id=%s chat_id=%s", row.id, row.chat_id
             )

@@ -8,6 +8,7 @@ from telethon.tl import types
 
 logger = logging.getLogger(__name__)
 
+
 def canonical_prefix(msg_id: int, chat_id: int) -> str:
     return f"{chat_id}_{msg_id}_"
 
@@ -37,7 +38,9 @@ def _guess_filename_from_media(media) -> str:
     if isinstance(media, (types.MessageMediaContact, types.Contact)):
         return "contact.vcf"
 
-    doc = media if isinstance(media, types.Document) else getattr(media, "document", None)
+    doc = (
+        media if isinstance(media, types.Document) else getattr(media, "document", None)
+    )
     if isinstance(doc, types.Document):
         for attr in getattr(doc, "attributes", []):
             if isinstance(attr, types.DocumentAttributeFilename) and getattr(
@@ -63,7 +66,15 @@ class PlaintextBufferStorage:
         self.max_buffer_size = max_buffer_size
 
     def buffer_find(self, msg_id: int, chat_id: int) -> Optional[str]:
-        return find_by_prefix(self.media_dir, msg_id, chat_id)
+        found = find_by_prefix(self.media_dir, msg_id, chat_id)
+        if found:
+            logger.debug(
+                "Found buffered media msg_id=%s chat_id=%s path=%s",
+                msg_id,
+                chat_id,
+                found,
+            )
+        return found
 
     async def _friendly_name(self, chat_id: int, base_file_name: str) -> str:
         try:
@@ -74,7 +85,10 @@ class PlaintextBufferStorage:
                 or "_".join(
                     filter(
                         None,
-                        [getattr(entity, "first_name", None), getattr(entity, "last_name", None)],
+                        [
+                            getattr(entity, "first_name", None),
+                            getattr(entity, "last_name", None),
+                        ],
                     )
                 )
                 or str(chat_id)
@@ -94,15 +108,29 @@ class PlaintextBufferStorage:
         except Exception:
             size = None
         if size is not None and size > self.max_buffer_size:
+            logger.info(
+                "Skipping media buffering due to size limit msg_id=%s chat_id=%s size=%s max=%s",
+                message.id,
+                message.chat_id or 0,
+                size,
+                self.max_buffer_size,
+            )
             return None
 
         chat_id = message.chat_id or 0
         if self.buffer_find(message.id, chat_id):
+            logger.debug(
+                "Skipping buffering because media already exists msg_id=%s chat_id=%s",
+                message.id,
+                chat_id,
+            )
             return None
 
         original_name = _guess_filename_from_media(media)
         human_name = await self._friendly_name(chat_id, original_name)
-        path = os.path.join(self.media_dir, f"{canonical_prefix(message.id, chat_id)}{human_name}")
+        path = os.path.join(
+            self.media_dir, f"{canonical_prefix(message.id, chat_id)}{human_name}"
+        )
 
         await self.client.download_media(media, path)
         return path
@@ -111,6 +139,7 @@ class PlaintextBufferStorage:
         ttl = timedelta(hours=ttl_hours)
         if not os.path.isdir(self.media_dir):
             return
+        purged = 0
         for name in os.listdir(self.media_dir):
             path = os.path.join(self.media_dir, name)
             if not os.path.isfile(path):
@@ -119,6 +148,11 @@ class PlaintextBufferStorage:
                 mtime = os.path.getmtime(path)
                 if datetime.fromtimestamp(mtime, tz=timezone.utc) < (now - ttl):
                     os.remove(path)
+                    purged += 1
             except Exception as e:
                 logger.warning("Failed to purge file %s: %s", path, e)
                 continue
+        if purged > 0:
+            logger.info("Purged buffered media files count=%s", purged)
+        else:
+            logger.debug("No buffered media files expired for purge")

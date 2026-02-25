@@ -2,7 +2,7 @@ import base64
 import os
 import tempfile
 from contextlib import contextmanager
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Iterator, Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -12,7 +12,9 @@ class EncryptedDeletedStorage:
         self.deleted_dir = deleted_dir
         self.key = base64.b64decode(key_b64)
         if len(self.key) != 32:
-            raise ValueError("DELETED_MEDIA_KEY_B64 must decode to 32 bytes (AES-256-GCM)")
+            raise ValueError(
+                "DELETED_MEDIA_KEY_B64 must decode to 32 bytes (AES-256-GCM)"
+            )
         self.aes = AESGCM(self.key)
 
     def buffer_find(self, msg_id: int, chat_id: int) -> Optional[str]:
@@ -44,19 +46,18 @@ class EncryptedDeletedStorage:
         return enc_path
 
     @contextmanager
-    def deleted_open_for_upload(self, enc_path: str) -> BinaryIO:
+    def deleted_open_for_upload(self, enc_path: str) -> Iterator[BinaryIO]:
         with open(enc_path, "rb") as f:
             blob = f.read()
+
+        if len(blob) < 13:
+            raise ValueError(f"Encrypted file is too short: {enc_path}")
+
         nonce, ct = blob[:12], blob[12:]
         data = self.aes.decrypt(nonce, ct, None)
 
-        with tempfile.NamedTemporaryFile("wb", delete=True) as tmp:
+        with tempfile.NamedTemporaryFile("w+b", delete=True) as tmp:
             tmp.write(data)
             tmp.flush()
-            return tmp.name
-        
-        tmp.seek(0)
-        try:
+            tmp.seek(0)
             yield tmp
-        finally:
-            tmp.close()
