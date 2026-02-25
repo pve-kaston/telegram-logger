@@ -92,21 +92,26 @@ async def _create_mention(
         last = (getattr(entity, "last_name", None) or "").strip()
         username = (getattr(entity, "username", None) or "").strip()
 
-        if first:
-            full_name = f"{first} {last}".strip()
-            full_name = _escape_md_label(full_name)
-            return f"[{full_name}](tg://user?id={entity.id})"
+        full_name = f"{first} {last}".strip()
 
         if username:
-            uname = _escape_md_label(username)
-            return f"[@{uname}](https://t.me/{username})"
+            label = _escape_md_label(full_name) if full_name else _escape_md_label(username)
+            logger.debug("[%s](https://t.me/%s)", label, username)
+            return f"[{label}](https://t.me/{username})"
+
+        if full_name:
+            label = _escape_md_label(full_name)
+            logger.debug("No username, plain text mention label: %s", label)
+            return label
 
         ent_id = getattr(entity, "id", entity_id)
         if isinstance(ent_id, int) and ent_id > 0:
-            return f"[User {ent_id}](tg://user?id={ent_id})"
+            return f"User {ent_id}"
+
         return str(ent_id)
 
-    except Exception:
+    except Exception as e:
+        logger.exception("Failed to create mention for entity_id=%s: %r", entity_id, e)
         if isinstance(entity_id, int) and entity_id > 0:
             return f"[User {entity_id}](tg://user?id={entity_id})"
         return str(entity_id)
