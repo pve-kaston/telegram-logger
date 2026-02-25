@@ -110,10 +110,27 @@ async def _create_mention(
 
         return str(ent_id)
 
-    except Exception as e:
-        logger.exception("Failed to create mention for entity_id=%s: %r", entity_id, e)
-        if isinstance(entity_id, int) and entity_id > 0:
-            return f"[User {entity_id}](tg://user?id={entity_id})"
+    except ValueError:
+        logger.warning(
+            "Entity not found for id=%s, using plain fallback",
+            entity_id,
+        )
+        if isinstance(entity_id, int):
+            if entity_id > 0:
+                return f"User {entity_id}"
+            return f"Chat {entity_id}"
+        return str(entity_id)
+
+    except Exception:
+        logger.debug(
+            "Unexpected error resolving entity_id=%s",
+            entity_id,
+            exc_info=True,
+        )
+        if isinstance(entity_id, int):
+            if entity_id > 0:
+                return f"User {entity_id}"
+            return f"Chat {entity_id}"
         return str(entity_id)
 
 
@@ -197,12 +214,6 @@ async def edited_deleted_handler(
         logger.info(
             "Skipping TTL/self-destruct event processing because PROCESS_SELF_DESTRUCT_MEDIA is disabled"
         )
-        return
-
-    if (
-        isinstance(event, types.UpdateReadMessagesContents)
-        and not settings.process_self_destruct_media
-    ):
         return
 
     ids = _ids_from_event(event, settings.max_deleted_messages_per_event)

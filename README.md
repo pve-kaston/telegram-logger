@@ -205,72 +205,148 @@ PY
 
 ---
 
-## Local run
+## Requirements
 
-### 1) Install dependencies
+* Python 3.10+
+* Telegram `API_ID`
+* Telegram `API_HASH`
+* Target `LOG_CHAT_ID`
+
+---
+
+## Local Run
+
+### 1. Setup
 
 ```bash
-cd src
-python -m venv .venv
+git clone https://github.com/pve-kaston/telegram-message-logger.git
+cd telegram-message-logger
+
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r src/requirements.txt
 ```
 
-### 2) Prepare environment
+---
 
-Create `.env` next to the `src/telegram_logger` entrypoint (or export env vars).
+### 2. Configure environment
 
-### 3) Run
+Create `.env` in the project root:
+
+```env
+API_ID=123456
+API_HASH=your_api_hash_here
+LOG_CHAT_ID=-1001234567890
+```
+
+> On first start, Telethon will create `data/db/user.session`.
+
+---
+
+### 3. Run
 
 ```bash
 python -m telegram_logger
 ```
 
-On first start, Telethon will create the session file in `${DATA_ROOT}/db/user.session`.
-
 ---
 
 ## Docker
 
-### Run via `docker run`
+Image:
+
+```
+ghcr.io/pve-kaston/telegram-message-logger:latest
+```
+
+### docker run
 
 ```bash
 docker run -it \
   -v $(pwd)/data:/data \
-  -e API_ID=123456 \
-  -e API_HASH="your_api_hash_here" \
-  -e LOG_CHAT_ID=-1001234567890 \
+  --env-file .env \
   ghcr.io/pve-kaston/telegram-message-logger:latest
-```
-
-### Run via Docker Compose
-
-1. Create a `.env` file with required variables (`API_ID`, `API_HASH`, `LOG_CHAT_ID`).
-2. Also create the directory `data/db/` and place `user.session` there.
-3. Run:
-
-```bash
-docker compose up
 ```
 
 ---
 
-## systemd
+## Docker Compose
 
-Unit file template: `telegram-logger.service`.
-
-Typical flow:
-
-1. Copy the project to `/opt/telegram_logger`.
-2. Place `user.session` in `/opt/telegram_logger/src/data/db/`.
-3. Prepare `/etc/telegram_logger/.env`.
-4. Create user `telegram_logger` and adjust permissions.
-5. Install the unit:
+Run:
 
 ```bash
-sudo cp telegram-logger.service /etc/systemd/system/telegram-logger.service
+docker compose up -d
+```
+
+Logs:
+
+```bash
+docker compose logs -f
+```
+
+---
+
+## Systemd
+
+### 1. Install dependencies
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip
+```
+
+---
+
+### 2. Install project
+
+```bash
+sudo mkdir -p /opt/telegram_logger
+sudo cp -r . /opt/telegram_logger
+cd /opt/telegram_logger
+
+sudo python3 -m venv venv
+sudo ./venv/bin/pip install --upgrade pip
+sudo ./venv/bin/pip install -r src/requirements.txt
+```
+
+---
+
+### 3. Configure environment
+
+```bash
+sudo mkdir -p /etc/telegram_logger
+sudo nano /etc/telegram_logger/.env
+```
+
+---
+
+### 4. Create service user
+
+```bash
+sudo useradd --system \
+  --home /opt/telegram_logger \
+  --shell /usr/sbin/nologin \
+  telegram_logger
+
+sudo chown -R telegram_logger:telegram_logger /opt/telegram_logger
+sudo chown -R telegram_logger:telegram_logger /etc/telegram_logger
+```
+
+---
+
+### 5. systemd unit
+
+Enable:
+
+```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now telegram-logger
+```
+
+Check logs:
+
+```bash
+sudo journalctl -u telegram-logger -f
 ```
 
 ---
