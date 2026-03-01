@@ -1,9 +1,11 @@
 import logging
 import os
 import re
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from telethon.errors import FileMigrateError, FileReferenceExpiredError
 from telethon.tl import types
 
 logger = logging.getLogger(__name__)
@@ -132,8 +134,39 @@ class PlaintextBufferStorage:
             self.media_dir, f"{canonical_prefix(message.id, chat_id)}{human_name}"
         )
 
-        await self.client.download_media(media, path)
-        return path
+        for attempt in (1, 2):
+            try:
+                await self.client.download_media(media, path)
+                return path
+            except (FileMigrateError, FileReferenceExpiredError) as e:
+                logger.warning(
+                    "Retrying media download after Telethon file error msg_id=%s chat_id=%s attempt=%s err=%s",
+                    message.id,
+                    chat_id,
+                    attempt,
+                    e,
+                )
+                with suppress(FileNotFoundError):
+                    os.remove(path)
+                if attempt == 2:
+                    logger.exception(
+                        "Failed to buffer media after retry msg_id=%s chat_id=%s",
+                        message.id,
+                        chat_id,
+                    )
+                    return None
+            except Exception as e:
+                logger.warning(
+                    "Failed to buffer media msg_id=%s chat_id=%s: %s",
+                    message.id,
+                    chat_id,
+                    e,
+                )
+                with suppress(FileNotFoundError):
+                    os.remove(path)
+                return None
+
+        return None
 
     async def purge_buffer_ttl(self, now: datetime, ttl_hours: int = 6) -> None:
         ttl = timedelta(hours=ttl_hours)
