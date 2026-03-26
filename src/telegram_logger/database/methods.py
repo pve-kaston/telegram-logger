@@ -81,6 +81,7 @@ async def get_message_ids_by_event(
             select(
                 DbMessage.id,
                 DbMessage.from_id,
+                DbMessage.type,
                 DbMessage.chat_id,
                 DbMessage.type,
                 DbMessage.msg_text,

@@ -9,12 +9,15 @@ from telethon import events
 from telethon.errors import FileMigrateError, FileReferenceExpiredError
 from telethon.hints import Entity
 from telethon.tl import types
+from telegram_logger.tg_types import ChatType
 
 from telegram_logger.tg_types import ChatType
 
 logger = logging.getLogger(__name__)
 KNOWN_CHAT_TYPES = {chat_type.value for chat_type in ChatType}
 
+logger = logging.getLogger(__name__)
+KNOWN_CHAT_TYPES = {chat_type.value for chat_type in ChatType}
 
 def _escape_md_label(text: str) -> str:
     value = (text or "").strip()
@@ -177,6 +180,19 @@ async def _send_deleted_file(
         link_preview=False,
     )
 
+def _should_save_deleted_message(row, settings) -> bool:
+    chat_type = (
+        ChatType(row.type) if row.type in KNOWN_CHAT_TYPES else ChatType.UNKNOWN
+    )
+
+    if chat_type in (ChatType.USER, ChatType.BOT):
+        return settings.save_deleted_from_private_chats
+    if chat_type == ChatType.GROUP:
+        return settings.save_deleted_from_groups
+    if chat_type == ChatType.CHANNEL:
+        return settings.save_deleted_from_channels
+
+    return True
 
 def _should_save_deleted_message(row, settings) -> bool:
     chat_type = (
