@@ -99,6 +99,30 @@ class PlaintextBufferStorage:
             chat_name = str(chat_id)
         return f"{_safe_name(chat_name)}_{_safe_name(base_file_name)}"
 
+    async def _refresh_media_reference(self, message):
+        chat_id = message.chat_id or 0
+        if not chat_id:
+            return None
+        try:
+            refreshed_message = await self.client.get_messages(chat_id, ids=message.id)
+        except Exception as e:
+            logger.warning(
+                "Failed to refresh media reference msg_id=%s chat_id=%s: %s",
+                message.id,
+                chat_id,
+                e,
+            )
+            return None
+
+        if not refreshed_message:
+            logger.warning(
+                "Refreshed message is empty msg_id=%s chat_id=%s",
+                message.id,
+                chat_id,
+            )
+            return None
+        return refreshed_message.media or getattr(refreshed_message, "video_note", None)
+
     async def buffer_save(self, message) -> Optional[str]:
         media = message.media or getattr(message, "video_note", None)
         if not media:
@@ -148,6 +172,10 @@ class PlaintextBufferStorage:
                 )
                 with suppress(FileNotFoundError):
                     os.remove(path)
+                if isinstance(e, FileReferenceExpiredError):
+                    refreshed_media = await self._refresh_media_reference(message)
+                    if refreshed_media:
+                        media = refreshed_media
                 if attempt == 2:
                     logger.exception(
                         "Failed to buffer media after retry msg_id=%s chat_id=%s",
